@@ -3,10 +3,7 @@
 #![cfg_attr(not(doctest), doc = include_str!("../README.md"))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-pub mod accumulator;
 mod de;
-
-mod eio;
 
 mod error;
 pub mod fixint;
@@ -56,49 +53,26 @@ pub mod experimental {
         // NOTE: ...and this is the derive macro
         pub use postcard_derive::MaxSize;
     }
-
-    pub use crate::ser::serialized_size;
 }
 
 pub use de::deserializer::Deserializer;
 pub use de::flavors as de_flavors;
-pub use de::{from_bytes, from_bytes_cobs, take_from_bytes, take_from_bytes_cobs};
+pub use de::from_bytes;
 pub use error::{Error, Result};
 pub use ser::flavors as ser_flavors;
-pub use ser::{serialize_with_flavor, serializer::Serializer, to_extend, to_slice, to_slice_cobs};
+pub use ser::{serialize_with_flavor, serializer::Serializer, to_extend, to_slice};
 
 #[cfg(feature = "heapless")]
-pub use ser::{to_vec, to_vec_cobs};
-
-#[cfg(any(feature = "embedded-io-04", feature = "embedded-io-06"))]
-pub use ser::to_eio;
-
-#[cfg(any(feature = "embedded-io-04", feature = "embedded-io-06"))]
-pub use de::from_eio;
+pub use ser::to_vec;
 
 #[cfg(feature = "use-std")]
-pub use ser::{to_io, to_stdvec, to_stdvec_cobs};
+pub use ser::{to_io, to_stdvec};
 
 #[cfg(feature = "use-std")]
 pub use de::from_io;
 
 #[cfg(feature = "alloc")]
-pub use ser::{to_allocvec, to_allocvec_cobs};
-
-#[cfg(feature = "use-crc")]
-pub use {
-    de::{from_bytes_crc32, take_from_bytes_crc32},
-    ser::to_slice_crc32,
-};
-
-#[cfg(all(feature = "use-crc", feature = "heapless"))]
-pub use ser::to_vec_crc32;
-
-#[cfg(all(feature = "use-crc", feature = "use-std"))]
-pub use ser::to_stdvec_crc32;
-
-#[cfg(all(feature = "use-crc", feature = "alloc"))]
-pub use ser::to_allocvec_crc32;
+pub use ser::to_allocvec;
 
 #[cfg(test)]
 mod test {

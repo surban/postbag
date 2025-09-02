@@ -1,129 +1,35 @@
-use cobs::{decode_in_place, decode_in_place_report};
-use serde::Deserialize;
+#[cfg(feature = "use-std")]
+use serde::de::DeserializeOwned;
 
 pub(crate) mod deserializer;
 pub mod flavors;
+mod skippable;
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use deserializer::Deserializer;
 
 /// Deserialize a message of type `T` from a byte slice. The unused portion (if any)
 /// of the byte slice is not returned.
-pub fn from_bytes<'a, T>(s: &'a [u8]) -> Result<T>
+pub fn from_bytes<T>(s: &[u8]) -> Result<T>
 where
-    T: Deserialize<'a>,
+    T: DeserializeOwned,
 {
     let mut deserializer = Deserializer::from_bytes(s);
     let t = T::deserialize(&mut deserializer)?;
     Ok(t)
 }
 
-/// Deserialize a message of type `T` from a cobs-encoded byte slice.
-///
-/// The unused portion (if any) of the byte slice is not returned.
-/// The used portion of the input slice is modified during deserialization (even if an error is returned).
-/// Therefore, if this is not desired, pass a clone of the original slice.
-pub fn from_bytes_cobs<'a, T>(s: &'a mut [u8]) -> Result<T>
-where
-    T: Deserialize<'a>,
-{
-    let sz = decode_in_place(s).map_err(|_| Error::DeserializeBadEncoding)?;
-    from_bytes::<T>(&s[..sz])
-}
-
-/// Deserialize a message of type `T` from a cobs-encoded byte slice.
-///
-/// The unused portion (if any) of the byte slice is returned for further usage.
-/// The used portion of the input slice is modified during deserialization (even if an error is returned).
-/// Therefore, if this is not desired, pass a clone of the original slice.
-pub fn take_from_bytes_cobs<'a, T>(s: &'a mut [u8]) -> Result<(T, &'a mut [u8])>
-where
-    T: Deserialize<'a>,
-{
-    let mut report = decode_in_place_report(s).map_err(|_| Error::DeserializeBadEncoding)?;
-
-    // The report does not include terminator bytes. If there is one in the
-    // buffer right AFTER the message, also include it.
-    if s.get(report.src_used) == Some(&0) {
-        report.src_used += 1;
-    }
-
-    // First split off the amount used for the "destination", which includes our now
-    // decoded message to deserialize
-    let (dst_used, dst_unused) = s.split_at_mut(report.dst_used);
-
-    // Then create a slice that includes the unused bytes, but DON'T include the
-    // excess bytes that were "shrunk" away from the original message
-    let (_unused, src_unused) = dst_unused.split_at_mut(report.src_used - report.dst_used);
-    Ok((from_bytes::<T>(dst_used)?, src_unused))
-}
-
-/// Deserialize a message of type `T` from a byte slice. The unused portion (if any)
-/// of the byte slice is returned for further usage
-pub fn take_from_bytes<'a, T>(s: &'a [u8]) -> Result<(T, &'a [u8])>
-where
-    T: Deserialize<'a>,
-{
-    let mut deserializer = Deserializer::from_bytes(s);
-    let t = T::deserialize(&mut deserializer)?;
-    Ok((t, deserializer.finalize()?))
-}
-
-/// Deserialize a message of type `T` from a [`embedded_io`](crate::eio::embedded_io)::[`Read`](crate::eio::Read).
-#[cfg(any(feature = "embedded-io-04", feature = "embedded-io-06"))]
-pub fn from_eio<'a, T, R>(val: (R, &'a mut [u8])) -> Result<(T, (R, &'a mut [u8]))>
-where
-    T: Deserialize<'a>,
-    R: crate::eio::Read + 'a,
-{
-    let flavor = flavors::io::eio::EIOReader::new(val.0, val.1);
-    let mut deserializer = Deserializer::from_flavor(flavor);
-    let t = T::deserialize(&mut deserializer)?;
-    Ok((t, deserializer.finalize()?))
-}
-
 /// Deserialize a message of type `T` from a [`std::io::Read`].
 #[cfg(feature = "use-std")]
-pub fn from_io<'a, T, R>(val: (R, &'a mut [u8])) -> Result<(T, (R, &'a mut [u8]))>
+pub fn from_io<T, R>(read: R) -> Result<(T, R)>
 where
-    T: Deserialize<'a>,
-    R: std::io::Read + 'a,
+    T: DeserializeOwned,
+    R: std::io::Read,
 {
-    let flavor = flavors::io::io::IOReader::new(val.0, val.1);
+    let flavor = flavors::io::io::IOReader::new(read);
     let mut deserializer = Deserializer::from_flavor(flavor);
     let t = T::deserialize(&mut deserializer)?;
     Ok((t, deserializer.finalize()?))
-}
-
-/// Conveniently deserialize a message of type `T` from a byte slice with a Crc. The unused portion (if any)
-/// of the byte slice is not returned.
-///
-/// See the `de_flavors::crc` module for the complete set of functions.
-#[cfg(feature = "use-crc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "use-crc")))]
-#[inline]
-pub fn from_bytes_crc32<'a, T>(s: &'a [u8], digest: crc::Digest<'a, u32>) -> Result<T>
-where
-    T: Deserialize<'a>,
-{
-    flavors::crc::from_bytes_u32(s, digest)
-}
-
-/// Conveniently deserialize a message of type `T` from a byte slice with a Crc. The unused portion (if any)
-/// of the byte slice is returned for further usage
-///
-/// See the `de_flavors::crc` module for the complete set of functions.
-#[cfg(feature = "use-crc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "use-crc")))]
-#[inline]
-pub fn take_from_bytes_crc32<'a, T>(
-    s: &'a [u8],
-    digest: crc::Digest<'a, u32>,
-) -> Result<(T, &'a [u8])>
-where
-    T: Deserialize<'a>,
-{
-    flavors::crc::take_from_bytes_u32(s, digest)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -132,7 +38,7 @@ where
 #[cfg(test)]
 mod test_heapless {
     use super::*;
-    use crate::{ser::to_vec, to_vec_cobs, varint::varint_max};
+    use crate::{ser::to_vec, varint::varint_max};
     use core::fmt::Write;
     use core::ops::Deref;
     use heapless::{FnvIndexMap, String, Vec};
@@ -376,30 +282,27 @@ mod test_heapless {
             &[1u8, 0x0A, 0x06, b'H', b'e', b'l', b'l', b'o', b'!'],
             output.deref()
         );
-        let out: (u8, u32, &str) = from_bytes(output.deref()).unwrap();
-        assert_eq!(out, (1u8, 10u32, "Hello!"));
+        let out: (u8, u32, std::string::String) = from_bytes(&output).unwrap();
+        assert_eq!(out, (1u8, 10u32, "Hello!".to_string()));
     }
 
     #[derive(Debug, Eq, PartialEq)]
-    pub struct ByteSliceStruct<'a> {
-        bytes: &'a [u8],
+    pub struct ByteSliceStruct {
+        bytes: std::vec::Vec<u8>,
     }
 
-    impl Serialize for ByteSliceStruct<'_> {
+    impl Serialize for ByteSliceStruct {
         fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
         where
             S: Serializer,
         {
             // Serialization is generic for all slice types, so the default serialization of byte
             // slices does not use `Serializer::serialize_bytes`.
-            serializer.serialize_bytes(self.bytes)
+            serializer.serialize_bytes(&self.bytes)
         }
     }
 
-    impl<'a, 'de> Deserialize<'de> for ByteSliceStruct<'a>
-    where
-        'de: 'a,
-    {
+    impl<'de> Deserialize<'de> for ByteSliceStruct {
         fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
         where
             D: Deserializer<'de>,
@@ -423,14 +326,21 @@ mod test_heapless {
         let x: &[u8] = &[0u8; 32];
         let output: Vec<u8, 128> = to_vec(x).unwrap();
         assert_eq!(output.len(), 33);
-        let out: &[u8] = from_bytes(output.deref()).unwrap();
+        let out: std::vec::Vec<u8> = from_bytes(output.deref()).unwrap();
         assert_eq!(out, [0u8; 32]);
 
-        let x = ByteSliceStruct { bytes: &[0u8; 32] };
+        let x = ByteSliceStruct {
+            bytes: vec![0u8; 32],
+        };
         let output: Vec<u8, 128> = to_vec(&x).unwrap();
         assert_eq!(output.len(), 33);
-        let out: ByteSliceStruct<'_> = from_bytes(output.deref()).unwrap();
-        assert_eq!(out, ByteSliceStruct { bytes: &[0u8; 32] });
+        let out: ByteSliceStruct = from_bytes(output.deref()).unwrap();
+        assert_eq!(
+            out,
+            ByteSliceStruct {
+                bytes: vec![0u8; 32]
+            }
+        );
     }
 
     #[test]
@@ -470,9 +380,9 @@ mod test_heapless {
     }
 
     #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
-    struct RefStruct<'a> {
-        bytes: &'a [u8],
-        str_s: &'a str,
+    struct RefStruct {
+        bytes: std::vec::Vec<u8>,
+        str_s: std::string::String,
     }
 
     #[test]
@@ -480,8 +390,8 @@ mod test_heapless {
         let message = "hElLo";
         let bytes = [0x01, 0x10, 0x02, 0x20];
         let output: Vec<u8, 11> = to_vec(&RefStruct {
-            bytes: &bytes,
-            str_s: message,
+            bytes: bytes.to_vec(),
+            str_s: message.to_string(),
         })
         .unwrap();
 
@@ -490,12 +400,12 @@ mod test_heapless {
             output.deref()
         );
 
-        let out: RefStruct<'_> = from_bytes(output.deref()).unwrap();
+        let out: RefStruct = from_bytes(output.deref()).unwrap();
         assert_eq!(
             out,
             RefStruct {
-                bytes: &bytes,
-                str_s: message,
+                bytes: bytes.to_vec(),
+                str_s: message.to_string(),
             }
         );
     }
@@ -536,46 +446,14 @@ mod test_heapless {
         let out: FnvIndexMap<u8, u8, 4> = from_bytes(output.deref()).unwrap();
         assert_eq!(input, out);
     }
-
-    #[test]
-    fn cobs_test() {
-        let message = "hElLo";
-        let bytes = [0x01, 0x00, 0x02, 0x20];
-        let input = RefStruct {
-            bytes: &bytes,
-            str_s: message,
-        };
-
-        let output: Vec<u8, 11> = to_vec(&input).unwrap();
-
-        let mut encode_buf = [0u8; 32];
-        let sz = cobs::encode(output.deref(), &mut encode_buf);
-        let out = from_bytes_cobs::<RefStruct<'_>>(&mut encode_buf[..sz]).unwrap();
-
-        assert_eq!(input, out);
-    }
-
-    #[test]
-    fn take_from_includes_terminator() {
-        // With the null terminator
-        let mut output: Vec<u8, 32> = to_vec_cobs(&(4i32, 0u8, 4u64)).unwrap();
-        let (val, remain) = take_from_bytes_cobs::<(i32, u8, u64)>(&mut output).unwrap();
-        assert_eq!((4, 0, 4), val);
-        assert_eq!(remain.len(), 0);
-
-        // without the null terminator
-        let mut output: Vec<u8, 32> = to_vec_cobs(&(4i32, 0u8, 4u64)).unwrap();
-        assert_eq!(output.pop(), Some(0));
-        let (val, remain) = take_from_bytes_cobs::<(i32, u8, u64)>(&mut output).unwrap();
-        assert_eq!((4, 0, 4), val);
-        assert_eq!(remain.len(), 0);
-    }
 }
 
 #[cfg(any(feature = "alloc", feature = "use-std"))]
 #[cfg(test)]
 mod test_alloc {
     extern crate alloc;
+
+    use crate::Error;
 
     use super::*;
 

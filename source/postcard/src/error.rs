@@ -36,9 +36,9 @@ pub enum Error {
     /// Bad CRC while deserializing
     DeserializeBadCrc,
     /// Serde Serialization Error
-    SerdeSerCustom,
+    SerdeSerCustom(String),
     /// Serde Deserialization Error
-    SerdeDeCustom,
+    SerdeDeCustom(String),
     /// Error while processing `collect_str` during serialization
     CollectStrError,
 }
@@ -67,32 +67,63 @@ const VARIANT_NAMES: [&str; 16] = [
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         use Error::*;
-        write!(
-            f,
-            "{}",
-            match self {
-                WontImplement => "This is a feature that PostCard will never implement",
-                NotYetImplemented => {
+        match self {
+            WontImplement => write!(f, "This is a feature that PostCard will never implement"),
+            NotYetImplemented => {
+                write!(
+                    f,
                     "This is a feature that Postcard intends to support, but does not yet"
-                }
-                SerializeBufferFull => "The serialize buffer is full",
-                SerializeSeqLengthUnknown => "The length of a sequence must be known",
-                DeserializeUnexpectedEnd => "Hit the end of buffer, expected more data",
-                DeserializeBadVarint => {
-                    "Found a varint that didn't terminate. Is the usize too big for this platform?"
-                }
-                DeserializeBadBool => "Found a bool that wasn't 0 or 1",
-                DeserializeBadChar => "Found an invalid unicode char",
-                DeserializeBadUtf8 => "Tried to parse invalid utf-8",
-                DeserializeBadOption => "Found an Option discriminant that wasn't 0 or 1",
-                DeserializeBadEnum => "Found an enum discriminant that was > u32::max_value()",
-                DeserializeBadEncoding => "The original data was not well encoded",
-                DeserializeBadCrc => "Bad CRC while deserializing",
-                SerdeSerCustom => "Serde Serialization Error",
-                SerdeDeCustom => "Serde Deserialization Error",
-                CollectStrError => "Error while processing `collect_str` during serialization",
+                )
             }
-        )
+            SerializeBufferFull => write!(f, "The serialize buffer is full"),
+            SerializeSeqLengthUnknown => write!(f, "The length of a sequence must be known"),
+            DeserializeUnexpectedEnd => write!(f, "Hit the end of buffer, expected more data"),
+            DeserializeBadVarint => {
+                write!(
+                    f,
+                    "Found a varint that didn't terminate. Is the usize too big for this platform?"
+                )
+            }
+            DeserializeBadBool => write!(f, "Found a bool that wasn't 0 or 1"),
+            DeserializeBadChar => write!(f, "Found an invalid unicode char"),
+            DeserializeBadUtf8 => write!(f, "Tried to parse invalid utf-8"),
+            DeserializeBadOption => write!(f, "Found an Option discriminant that wasn't 0 or 1"),
+            DeserializeBadEnum => {
+                write!(f, "Found an enum discriminant that was > u32::max_value()")
+            }
+            DeserializeBadEncoding => write!(f, "The original data was not well encoded"),
+            DeserializeBadCrc => write!(f, "Bad CRC while deserializing"),
+            SerdeSerCustom(msg) => write!(f, "Serde Serialization Error: {msg}"),
+            SerdeDeCustom(msg) => write!(f, "Serde Deserialization Error: {msg}"),
+            CollectStrError => write!(
+                f,
+                "Error while processing `collect_str` during serialization"
+            ),
+        }
+    }
+}
+
+impl Error {
+    /// Variant index.
+    fn variant(&self) -> usize {
+        match self {
+            Error::WontImplement => 0,
+            Error::NotYetImplemented => 1,
+            Error::SerializeBufferFull => 2,
+            Error::SerializeSeqLengthUnknown => 3,
+            Error::DeserializeUnexpectedEnd => 4,
+            Error::DeserializeBadVarint => 5,
+            Error::DeserializeBadBool => 6,
+            Error::DeserializeBadChar => 7,
+            Error::DeserializeBadUtf8 => 8,
+            Error::DeserializeBadOption => 9,
+            Error::DeserializeBadEnum => 10,
+            Error::DeserializeBadEncoding => 11,
+            Error::DeserializeBadCrc => 12,
+            Error::SerdeSerCustom(_) => 13,
+            Error::SerdeDeCustom(_) => 14,
+            Error::CollectStrError => 15,
+        }
     }
 }
 
@@ -100,20 +131,20 @@ impl Display for Error {
 pub type Result<T> = ::core::result::Result<T, Error>;
 
 impl serde::ser::Error for Error {
-    fn custom<T>(_msg: T) -> Self
+    fn custom<T>(msg: T) -> Self
     where
         T: Display,
     {
-        Error::SerdeSerCustom
+        Error::SerdeSerCustom(msg.to_string())
     }
 }
 
 impl serde::de::Error for Error {
-    fn custom<T>(_msg: T) -> Self
+    fn custom<T>(msg: T) -> Self
     where
         T: Display,
     {
-        Error::SerdeDeCustom
+        Error::SerdeDeCustom(msg.to_string())
     }
 }
 
@@ -124,11 +155,8 @@ impl Serialize for Error {
     where
         S: Serializer,
     {
-        serializer.serialize_unit_variant(
-            "Error",
-            self.clone() as u32,
-            VARIANT_NAMES[self.clone() as usize],
-        )
+        let index = self.variant();
+        serializer.serialize_unit_variant("Error", index as u32, VARIANT_NAMES[index])
     }
 }
 
@@ -184,8 +212,8 @@ impl<'de> Deserialize<'de> for Error {
                     10 => Ok(Error::DeserializeBadEnum),
                     11 => Ok(Error::DeserializeBadEncoding),
                     12 => Ok(Error::DeserializeBadCrc),
-                    13 => Ok(Error::SerdeSerCustom),
-                    14 => Ok(Error::SerdeDeCustom),
+                    13 => Ok(Error::SerdeSerCustom(String::new())),
+                    14 => Ok(Error::SerdeDeCustom(String::new())),
                     15 => Ok(Error::CollectStrError),
                     _ => Err(E::invalid_value(
                         Unexpected::Unsigned(value),
@@ -212,8 +240,8 @@ impl<'de> Deserialize<'de> for Error {
                     "DeserializeBadEnum" => Ok(Error::DeserializeBadEnum),
                     "DeserializeBadEncoding" => Ok(Error::DeserializeBadEncoding),
                     "DeserializeBadCrc" => Ok(Error::DeserializeBadCrc),
-                    "SerdeSerCustom" => Ok(Error::SerdeSerCustom),
-                    "SerdeDeCustom" => Ok(Error::SerdeDeCustom),
+                    "SerdeSerCustom" => Ok(Error::SerdeSerCustom(String::new())),
+                    "SerdeDeCustom" => Ok(Error::SerdeDeCustom(String::new())),
                     "CollectStrError" => Ok(Error::CollectStrError),
                     _ => Err(E::unknown_variant(value, &VARIANT_NAMES)),
                 }
@@ -249,7 +277,7 @@ mod tests {
             };
 
             // Verify integer representation matches discriminant
-            assert_eq!(i, error.clone() as u32);
+            assert_eq!(i, error.variant() as u32);
 
             // Serialize from Error to integer
             let mut buf = [0u8; 1];
@@ -260,7 +288,7 @@ mod tests {
             let string = DisplayEnumUsingSerde(error.clone()).to_string();
 
             // Verify string representation matches derived Debug impl
-            assert_eq!(string, format!("{error:?}"));
+            assert_eq!(string, format!("{error:?}").trim_end_matches("(\"\")"));
 
             // Deserialize from string to Error
             let de = serde::de::value::StrDeserializer::<Error>::new(&string);

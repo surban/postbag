@@ -1,8 +1,11 @@
 use serde::{ser, Serialize};
 
-use crate::error::{Error, Result};
 use crate::ser::flavors::Flavor;
 use crate::varint::*;
+use crate::{
+    error::{Error, Result},
+    ser::skippable::SkipStack,
+};
 
 /// A `serde` compatible serializer, generic over "Flavors" of serializing plugins.
 ///
@@ -18,7 +21,7 @@ where
 {
     /// This is the Flavor(s) that will be used to modify or store any bytes generated
     /// by serialization
-    pub output: F,
+    pub output: SkipStack<F>,
 }
 
 impl<F: Flavor> Serializer<F> {
@@ -365,7 +368,7 @@ where
         where
             IF: Flavor,
         {
-            output: &'a mut IF,
+            output: &'a mut SkipStack<IF>,
         }
         impl<IF> Write for FmtWriter<'_, IF>
         where
@@ -517,7 +520,10 @@ where
     where
         T: ?Sized + Serialize,
     {
-        value.serialize(&mut **self)
+        //self.output.start_skippable();
+        value.serialize(&mut **self)?;
+        //self.output.end_skippable()?;
+        Ok(())
     }
 
     #[inline]

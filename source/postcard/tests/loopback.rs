@@ -188,9 +188,8 @@ fn std_io_loopback() {
         assert_eq!(ser.len(), ser_rep.len());
         assert_eq!(ser, ser_rep);
         {
-            let mut buff = [0; 2048];
             let x = ser.clone();
-            let deserialized: T = from_io((x.as_slice(), &mut buff)).unwrap().0;
+            let deserialized: T = from_io(x.as_slice()).unwrap().0;
             assert_eq!(data, deserialized);
         }
     }
