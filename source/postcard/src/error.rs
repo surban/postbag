@@ -280,8 +280,7 @@ mod tests {
             assert_eq!(i, error.variant() as u32);
 
             // Serialize from Error to integer
-            let mut buf = [0u8; 1];
-            crate::to_slice(&error, &mut buf).unwrap();
+            let buf = crate::to_vec(&error).unwrap();
             assert_eq!(i, buf[0] as u32);
 
             // Serialize from Error to string

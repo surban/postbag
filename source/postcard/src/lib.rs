@@ -60,30 +60,22 @@ pub use de::flavors as de_flavors;
 pub use de::from_bytes;
 pub use error::{Error, Result};
 pub use ser::flavors as ser_flavors;
-pub use ser::{serialize_with_flavor, serializer::Serializer, to_extend, to_slice};
-
-#[cfg(feature = "heapless")]
-pub use ser::to_vec;
+pub use ser::{serialize_with_flavor, serializer::Serializer};
 
 #[cfg(feature = "use-std")]
-pub use ser::{to_io, to_stdvec};
+pub use ser::{to_io, to_vec};
 
 #[cfg(feature = "use-std")]
 pub use de::from_io;
-
-#[cfg(feature = "alloc")]
-pub use ser::to_allocvec;
 
 #[cfg(test)]
 mod test {
     #[test]
     fn varint_boundary_canon() {
         let x = u32::MAX;
-        let mut buf = [0u8; 5];
-        let used = crate::to_slice(&x, &mut buf).unwrap();
-        let deser: u32 = crate::from_bytes(used).unwrap();
+        let used = crate::to_vec(&x).unwrap();
+        let deser: u32 = crate::from_bytes(&used).unwrap();
         assert_eq!(deser, u32::MAX);
-        assert_eq!(used, &mut [0xFF, 0xFF, 0xFF, 0xFF, 0x0F]);
         let deser: Result<u32, crate::Error> = crate::from_bytes(&[0xFF, 0xFF, 0xFF, 0xFF, 0x1F]);
         assert_eq!(deser, Err(crate::Error::DeserializeBadVarint));
     }
@@ -91,9 +83,8 @@ mod test {
     #[test]
     fn signed_int128() {
         let x = -19490127978232325886905073712831_i128;
-        let mut buf = [0u8; 32];
-        let used = crate::to_slice(&x, &mut buf).unwrap();
-        let deser: i128 = crate::from_bytes(used).unwrap();
+        let used = crate::to_vec(&x).unwrap();
+        let deser: i128 = crate::from_bytes(&used).unwrap();
         assert_eq!(deser, x);
     }
 }

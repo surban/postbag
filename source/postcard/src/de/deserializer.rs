@@ -155,9 +155,37 @@ impl<'a, 'b: 'a, F: Flavor> serde::de::SeqAccess<'b> for SeqAccess<'a, 'b, F> {
     fn next_element_seed<V: DeserializeSeed<'b>>(&mut self, seed: V) -> Result<Option<V::Value>> {
         if self.len > 0 {
             self.len -= 1;
-            //self.deserializer.flavor.start_skippable();
             let data = DeserializeSeed::deserialize(seed, &mut *self.deserializer)?;
-            //self.deserializer.flavor.end_skippable()?;
+            Ok(Some(data))
+        } else {
+            Ok(None)
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> Option<usize> {
+        match self.deserializer.flavor.size_hint() {
+            Some(size) if size < self.len => None,
+            _ => Some(self.len),
+        }
+    }
+}
+
+struct StructFieldAccess<'a, 'b, F: Flavor> {
+    deserializer: &'a mut Deserializer<'b, F>,
+    len: usize,
+}
+
+impl<'a, 'b: 'a, F: Flavor> serde::de::SeqAccess<'b> for StructFieldAccess<'a, 'b, F> {
+    type Error = Error;
+
+    #[inline]
+    fn next_element_seed<V: DeserializeSeed<'b>>(&mut self, seed: V) -> Result<Option<V::Value>> {
+        if self.len > 0 {
+            self.len -= 1;
+            self.deserializer.flavor.start_skippable();
+            let data = DeserializeSeed::deserialize(seed, &mut *self.deserializer)?;
+            self.deserializer.flavor.end_skippable()?;
             Ok(Some(data))
         } else {
             Ok(None)
@@ -507,7 +535,10 @@ impl<'de, F: Flavor> de::Deserializer<'de> for &mut Deserializer<'de, F> {
     where
         V: Visitor<'de>,
     {
-        self.deserialize_tuple(fields.len(), visitor)
+        visitor.visit_seq(StructFieldAccess {
+            deserializer: self,
+            len: fields.len(),
+        })
     }
 
     #[inline]

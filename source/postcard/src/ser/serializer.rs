@@ -520,9 +520,9 @@ where
     where
         T: ?Sized + Serialize,
     {
-        //self.output.start_skippable();
+        self.output.start_skippable();
         value.serialize(&mut **self)?;
-        //self.output.end_skippable()?;
+        self.output.end_skippable()?;
         Ok(())
     }
 
