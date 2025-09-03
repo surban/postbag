@@ -9,10 +9,7 @@ pub mod fixint;
 mod ser;
 mod varint;
 
-pub use cfg::Cfg;
-pub use de::deserializer::Deserializer;
-pub use de::from_io;
-pub use de::from_slice;
+pub use cfg::{Cfg, Config, DefaultCfg};
+pub use de::{from_io, from_io_with_cfg, from_slice, from_slice_with_cfg};
 pub use error::{Error, Result};
-pub use ser::serializer::Serializer;
-pub use ser::{to_io, to_vec};
+pub use ser::{to_io, to_io_with_cfg, to_vec, to_vec_with_cfg};

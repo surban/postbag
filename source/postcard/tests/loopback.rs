@@ -1,4 +1,4 @@
-use postcard::{Error, from_slice, to_vec};
+use postcard::{Cfg, Config, Error, from_slice, from_slice_with_cfg, to_vec_with_cfg};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
 use std::fmt::Debug;
 use std::fmt::Write;
@@ -7,19 +7,36 @@ use std::{collections::BTreeMap, io::ErrorKind};
 /// Performs serialization followed by deserialization and checks that the
 /// deserialized value is unchanged.
 #[track_caller]
+pub fn loopback_with_cfg<T, CFG>(value: &T)
+where
+    T: Serialize + DeserializeOwned + Debug + Eq,
+    CFG: Cfg,
+{
+    let serialized = to_vec_with_cfg::<_, CFG>(&value).expect("serialization failed");
+    println!("{serialized:02x?}");
+    dbg!(serialized.len());
+
+    let deserialized: T =
+        from_slice_with_cfg::<_, CFG>(&serialized).expect("deserialization failed");
+
+    assert_eq!(
+        *value, deserialized,
+        "deserialized value does not match original value"
+    );
+}
+
+/// Performs serialization followed by deserialization and checks that the
+/// deserialized value is unchanged.
+#[track_caller]
 pub fn loopback<T>(value: T)
 where
     T: Serialize + DeserializeOwned + Debug + Eq,
 {
-    let serialized = to_vec(&value).expect("serialization failed");
-    dbg!(serialized.len());
+    println!("Testing with field names");
+    loopback_with_cfg::<_, Config<true>>(&value);
 
-    let deserialized: T = from_slice(&serialized).expect("deserialization failed");
-
-    assert_eq!(
-        value, deserialized,
-        "deserialized value does not match original value"
-    );
+    println!("Testing without field names");
+    loopback_with_cfg::<_, Config<false>>(&value);
 }
 
 // =============================================================================
