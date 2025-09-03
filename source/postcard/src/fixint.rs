@@ -103,7 +103,7 @@ macro_rules! impl_fixint {
     ($( $int:ty ),*) => {
         $(
             impl Serialize for LE<$int> {
-                #[inline]
+
                 fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
                 where
                     S: Serializer,
@@ -113,7 +113,7 @@ macro_rules! impl_fixint {
             }
 
             impl<'de> Deserialize<'de> for LE<$int> {
-                #[inline]
+
                 fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
                 where
                     D: serde::Deserializer<'de>,
@@ -125,7 +125,7 @@ macro_rules! impl_fixint {
             }
 
             impl Serialize for BE<$int> {
-                #[inline]
+
                 fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
                 where
                     S: Serializer,
@@ -135,7 +135,7 @@ macro_rules! impl_fixint {
             }
 
             impl<'de> Deserialize<'de> for BE<$int> {
-                #[inline]
+
                 fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
                 where
                     D: serde::Deserializer<'de>,

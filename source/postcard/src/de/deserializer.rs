@@ -1,8 +1,8 @@
 use serde::de::{self, DeserializeSeed, IntoDeserializer, Visitor, value::U32Deserializer};
 
-use crate::de::skippable::SkipRead;
 use crate::error::{Error, Result};
 use crate::varint::{max_of_last_byte, varint_max};
+use crate::{Cfg, cfg::DefaultCfg, de::skippable::SkipRead};
 use core::marker::PhantomData;
 use std::io::Read;
 
@@ -10,12 +10,13 @@ use std::io::Read;
 ///
 /// Please note that postcard messages are not self-describing and therefore incompatible with
 /// [internally tagged enums](https://serde.rs/enum-representations.html#internally-tagged).
-pub struct Deserializer<'de, R> {
+pub struct Deserializer<'de, R, CFG = DefaultCfg> {
     input: SkipRead<R>,
-    phantom: PhantomData<&'de ()>,
+    _de: PhantomData<&'de ()>,
+    _cfg: PhantomData<CFG>,
 }
 
-impl<'de, R> Deserializer<'de, R>
+impl<'de, R, CFG: Cfg> Deserializer<'de, R, CFG>
 where
     R: Read,
 {
@@ -23,12 +24,12 @@ where
     pub fn new(read: R) -> Self {
         Deserializer {
             input: SkipRead::new(read),
-            phantom: PhantomData,
+            _de: PhantomData,
+            _cfg: PhantomData,
         }
     }
 
-    /// Return the remaining (unused) bytes in the Deserializer along with any
-    /// additional data provided by the [`Flavor`]
+    /// Returns the reader.
     pub fn finalize(self) -> R {
         self.input.into_inner()
     }
@@ -37,33 +38,16 @@ where
 impl<'de> Deserializer<'de, &'de [u8]> {
     /// Obtain a Deserializer from a slice of bytes
     pub fn from_slice(input: &'de [u8]) -> Self {
-        //let buf = input.to_vec();
-        //let cursor = Cursor::new(buf);
-
         Self::new(input)
     }
 }
 
 impl<'de, R: Read> Deserializer<'de, R> {
-    #[cfg(target_pointer_width = "16")]
-    #[inline(always)]
     fn try_take_varint_usize(&mut self) -> Result<usize> {
-        self.try_take_varint_u16().map(|u| u as usize)
+        let value = self.try_take_varint_u64()?;
+        usize::try_from(value).map_err(|_| Error::UsizeOverflow)
     }
 
-    #[cfg(target_pointer_width = "32")]
-    #[inline(always)]
-    fn try_take_varint_usize(&mut self) -> Result<usize> {
-        self.try_take_varint_u32().map(|u| u as usize)
-    }
-
-    #[cfg(target_pointer_width = "64")]
-    #[inline(always)]
-    fn try_take_varint_usize(&mut self) -> Result<usize> {
-        self.try_take_varint_u64().map(|u| u as usize)
-    }
-
-    #[inline]
     fn try_take_varint_u16(&mut self) -> Result<u16> {
         let mut out = 0;
         for i in 0..varint_max::<u16>() {
@@ -82,7 +66,6 @@ impl<'de, R: Read> Deserializer<'de, R> {
         Err(Error::DeserializeBadVarint)
     }
 
-    #[inline]
     fn try_take_varint_u32(&mut self) -> Result<u32> {
         let mut out = 0;
         for i in 0..varint_max::<u32>() {
@@ -101,7 +84,6 @@ impl<'de, R: Read> Deserializer<'de, R> {
         Err(Error::DeserializeBadVarint)
     }
 
-    #[inline]
     fn try_take_varint_u64(&mut self) -> Result<u64> {
         let mut out = 0;
         for i in 0..varint_max::<u64>() {
@@ -120,7 +102,6 @@ impl<'de, R: Read> Deserializer<'de, R> {
         Err(Error::DeserializeBadVarint)
     }
 
-    #[inline]
     fn try_take_varint_u128(&mut self) -> Result<u128> {
         let mut out = 0;
         for i in 0..varint_max::<u128>() {
@@ -148,7 +129,6 @@ struct SeqAccess<'a, 'b, R> {
 impl<'a, 'b: 'a, R: Read> serde::de::SeqAccess<'b> for SeqAccess<'a, 'b, R> {
     type Error = Error;
 
-    #[inline]
     fn next_element_seed<V: DeserializeSeed<'b>>(&mut self, seed: V) -> Result<Option<V::Value>> {
         if self.len > 0 {
             self.len -= 1;
@@ -159,7 +139,6 @@ impl<'a, 'b: 'a, R: Read> serde::de::SeqAccess<'b> for SeqAccess<'a, 'b, R> {
         }
     }
 
-    #[inline]
     fn size_hint(&self) -> Option<usize> {
         Some(self.len)
     }
@@ -173,7 +152,6 @@ struct StructFieldAccess<'a, 'b, R> {
 impl<'a, 'b: 'a, R: Read> serde::de::MapAccess<'b> for StructFieldAccess<'a, 'b, R> {
     type Error = Error;
 
-    #[inline]
     fn next_key_seed<K: DeserializeSeed<'b>>(&mut self, seed: K) -> Result<Option<K::Value>> {
         if self.len > 0 {
             self.len -= 1;
@@ -184,7 +162,6 @@ impl<'a, 'b: 'a, R: Read> serde::de::MapAccess<'b> for StructFieldAccess<'a, 'b,
         }
     }
 
-    #[inline]
     fn next_value_seed<V: DeserializeSeed<'b>>(&mut self, seed: V) -> Result<V::Value> {
         self.deserializer.input.start_skippable();
         let value = DeserializeSeed::deserialize(seed, &mut *self.deserializer)?;
@@ -192,7 +169,6 @@ impl<'a, 'b: 'a, R: Read> serde::de::MapAccess<'b> for StructFieldAccess<'a, 'b,
         Ok(value)
     }
 
-    #[inline]
     fn size_hint(&self) -> Option<usize> {
         Some(self.len)
     }
@@ -206,7 +182,6 @@ struct MapAccess<'a, 'b, R> {
 impl<'a, 'b: 'a, R: Read> serde::de::MapAccess<'b> for MapAccess<'a, 'b, R> {
     type Error = Error;
 
-    #[inline]
     fn next_key_seed<K: DeserializeSeed<'b>>(&mut self, seed: K) -> Result<Option<K::Value>> {
         if self.len > 0 {
             self.len -= 1;
@@ -219,12 +194,10 @@ impl<'a, 'b: 'a, R: Read> serde::de::MapAccess<'b> for MapAccess<'a, 'b, R> {
         }
     }
 
-    #[inline]
     fn next_value_seed<V: DeserializeSeed<'b>>(&mut self, seed: V) -> Result<V::Value> {
         DeserializeSeed::deserialize(seed, &mut *self.deserializer)
     }
 
-    #[inline]
     fn size_hint(&self) -> Option<usize> {
         Some(self.len)
     }
@@ -233,24 +206,20 @@ impl<'a, 'b: 'a, R: Read> serde::de::MapAccess<'b> for MapAccess<'a, 'b, R> {
 impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
     type Error = Error;
 
-    #[inline]
     fn is_human_readable(&self) -> bool {
         false
     }
 
-    // Postcard does not support structures not known at compile time
-    #[inline]
     fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
+        // Postcard does not support structures not known at compile time
         panic!("deserialize_any");
-        // We wont ever support this.
         //Err(Error::WontImplement)
     }
 
     // Take a boolean encoded as a u8
-    #[inline]
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -263,7 +232,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         visitor.visit_bool(val)
     }
 
-    #[inline]
     fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -271,7 +239,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         visitor.visit_i8(self.input.pop()? as i8)
     }
 
-    #[inline]
     fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -280,7 +247,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         visitor.visit_i16(de_zig_zag_i16(v))
     }
 
-    #[inline]
     fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -289,7 +255,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         visitor.visit_i32(de_zig_zag_i32(v))
     }
 
-    #[inline]
     fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -298,7 +263,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         visitor.visit_i64(de_zig_zag_i64(v))
     }
 
-    #[inline]
     fn deserialize_i128<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -307,7 +271,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         visitor.visit_i128(de_zig_zag_i128(v))
     }
 
-    #[inline]
     fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -315,7 +278,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         visitor.visit_u8(self.input.pop()?)
     }
 
-    #[inline]
     fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -324,7 +286,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         visitor.visit_u16(v)
     }
 
-    #[inline]
     fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -333,7 +294,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         visitor.visit_u32(v)
     }
 
-    #[inline]
     fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -342,7 +302,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         visitor.visit_u64(v)
     }
 
-    #[inline]
     fn deserialize_u128<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -351,7 +310,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         visitor.visit_u128(v)
     }
 
-    #[inline]
     fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -362,7 +320,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         )))
     }
 
-    #[inline]
     fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -373,7 +330,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         )))
     }
 
-    #[inline]
     fn deserialize_char<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -395,7 +351,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         visitor.visit_char(character)
     }
 
-    #[inline]
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -403,7 +358,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         self.deserialize_string(visitor)
     }
 
-    #[inline]
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -415,7 +369,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         visitor.visit_string(str_sl)
     }
 
-    #[inline]
     fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -423,7 +376,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         self.deserialize_byte_buf(visitor)
     }
 
-    #[inline]
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -433,7 +385,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         visitor.visit_byte_buf(bytes)
     }
 
-    #[inline]
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -447,7 +398,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
 
     // In Serde, unit means an anonymous value containing no data.
     // Unit is not actually encoded in Postcard.
-    #[inline]
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -457,7 +407,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
 
     // Unit struct means a named value containing no data.
     // Unit structs are not actually encoded in Postcard.
-    #[inline]
     fn deserialize_unit_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -465,7 +414,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         self.deserialize_unit(visitor)
     }
 
-    #[inline]
     fn deserialize_newtype_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -473,7 +421,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         visitor.visit_newtype_struct(self)
     }
 
-    #[inline]
     fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -486,7 +433,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         })
     }
 
-    #[inline]
     fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -497,7 +443,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         })
     }
 
-    #[inline]
     fn deserialize_tuple_struct<V>(
         self,
         _name: &'static str,
@@ -510,7 +455,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         self.deserialize_tuple(len, visitor)
     }
 
-    #[inline]
     fn deserialize_map<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -523,7 +467,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         })
     }
 
-    #[inline]
     fn deserialize_struct<V>(
         self,
         _name: &'static str,
@@ -540,7 +483,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         })
     }
 
-    #[inline]
     fn deserialize_enum<V>(
         self,
         _name: &'static str,
@@ -553,8 +495,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         visitor.visit_enum(self)
     }
 
-    // As a binary format, Postcard does not encode identifiers
-    #[inline]
     fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -566,7 +506,6 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         visitor.visit_string(str_sl)
     }
 
-    #[inline]
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -579,22 +518,18 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
 impl<'de, R: Read> serde::de::VariantAccess<'de> for &mut Deserializer<'de, R> {
     type Error = Error;
 
-    #[inline]
     fn unit_variant(self) -> Result<()> {
         Ok(())
     }
 
-    #[inline]
     fn newtype_variant_seed<V: DeserializeSeed<'de>>(self, seed: V) -> Result<V::Value> {
         DeserializeSeed::deserialize(seed, self)
     }
 
-    #[inline]
     fn tuple_variant<V: Visitor<'de>>(self, len: usize, visitor: V) -> Result<V::Value> {
         serde::de::Deserializer::deserialize_tuple(self, len, visitor)
     }
 
-    #[inline]
     fn struct_variant<V: Visitor<'de>>(
         self,
         fields: &'static [&'static str],
@@ -608,7 +543,6 @@ impl<'de, R: Read> serde::de::EnumAccess<'de> for &mut Deserializer<'de, R> {
     type Error = Error;
     type Variant = Self;
 
-    #[inline]
     fn variant_seed<V: DeserializeSeed<'de>>(self, seed: V) -> Result<(V::Value, Self)> {
         let varint = self.try_take_varint_u32()?;
         let deserializer: U32Deserializer<Error> = varint.into_deserializer();

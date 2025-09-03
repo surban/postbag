@@ -4,6 +4,7 @@
 
 mod de;
 
+mod cfg;
 mod error;
 pub mod fixint;
 mod ser;
@@ -14,28 +15,6 @@ pub use de::from_bytes;
 pub use error::{Error, Result};
 pub use ser::serializer::Serializer;
 
+pub use cfg::Cfg;
 pub use de::from_io;
 pub use ser::{to_io, to_vec};
-
-/// Configuration.
-#[derive(Debug, Clone, Copy)]
-pub struct Cfg {
-    /// Encode identifiers.
-    pub with_identifiers: bool,
-}
-
-impl Cfg {
-    /// Default configuration.
-    pub const DEFAULT: Cfg = Cfg {
-        with_identifiers: true,
-    };
-}
-
-impl Default for Cfg {
-    fn default() -> Self {
-        Self::DEFAULT
-    }
-}
-
-#[cfg(test)]
-mod test {}

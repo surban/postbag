@@ -1,6 +1,6 @@
-use crate::{error::Result, ser::skippable::SkipWrite};
 use serde::Serialize;
 
+use crate::error::Result;
 use crate::ser::serializer::Serializer;
 
 pub(crate) mod serializer;
@@ -20,7 +20,7 @@ pub(crate) mod skippable;
 /// assert_eq!(ser.as_slice(), &[0x03, b'H', b'i', b'!']);
 /// ```
 #[cfg_attr(docsrs, doc(cfg(feature = "use-std")))]
-#[inline]
+
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>>
 where
     T: Serialize + ?Sized,
@@ -45,12 +45,7 @@ where
     T: Serialize + ?Sized,
     W: std::io::Write,
 {
-    let mut serializer = Serializer {
-        output: SkipWrite::new(writer),
-    };
-
+    let mut serializer = Serializer::new(writer);
     value.serialize(&mut serializer)?;
-
-    let writer = serializer.output.into_inner()?;
-    Ok(writer)
+    serializer.finalize()
 }
