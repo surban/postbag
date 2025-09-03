@@ -1,4 +1,7 @@
-use serde::de::{self, DeserializeSeed, IntoDeserializer, Visitor, value::U32Deserializer};
+use serde::de::{
+    self, DeserializeSeed, IntoDeserializer, Visitor,
+    value::{StringDeserializer, U32Deserializer},
+};
 
 use crate::error::{Error, Result};
 use crate::varint::{max_of_last_byte, varint_max};
@@ -542,9 +545,18 @@ impl<'de, R: Read, CFG: Cfg> serde::de::EnumAccess<'de> for &mut Deserializer<'d
     type Variant = Self;
 
     fn variant_seed<V: DeserializeSeed<'de>>(self, seed: V) -> Result<(V::Value, Self)> {
-        let varint = self.try_take_varint_u32()?;
-        let deserializer: U32Deserializer<Error> = varint.into_deserializer();
-        let v = DeserializeSeed::deserialize(seed, deserializer)?;
+        let v = if CFG::with_identifiers() {
+            let sz = self.try_take_varint_usize()?;
+            let bytes = self.input.read(sz)?;
+            let str_sl = String::from_utf8(bytes).map_err(|_| Error::DeserializeBadUtf8)?;
+            let deserializer: StringDeserializer<Error> = str_sl.into_deserializer();
+            DeserializeSeed::deserialize(seed, deserializer)?
+        } else {
+            let varint = self.try_take_varint_u32()?;
+            let deserializer: U32Deserializer<Error> = varint.into_deserializer();
+            DeserializeSeed::deserialize(seed, deserializer)?
+        };
+
         Ok((v, self))
     }
 }

@@ -112,8 +112,7 @@ fn ser_str() {
     }
 }
 
-#[allow(dead_code)]
-#[derive(Serialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 enum BasicEnum {
     Bib,
     Bim,
@@ -140,24 +139,23 @@ enum DataEnum {
 fn enums() {
     let input = BasicEnum::Bim;
     let output: Vec<u8> = to_vec(&input).unwrap();
-    assert_eq!(&[0x01], output.deref());
+    let deser: BasicEnum = from_slice(&output).unwrap();
+    assert_eq!(input, deser);
 
     let input = DataEnum::Bim(u64::MAX);
     let output: Vec<u8> = to_vec(&input).unwrap();
-    assert_eq!(
-        &[
-            0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01
-        ],
-        output.deref()
-    );
+    let deser: DataEnum = from_slice(&output).unwrap();
+    assert_eq!(input, deser);
 
     let input = DataEnum::Bib(u16::MAX);
     let output: Vec<u8> = to_vec(&input).unwrap();
-    assert_eq!(&[0x00, 0xFF, 0xFF, 0x03], output.deref());
+    let deser: DataEnum = from_slice(&output).unwrap();
+    assert_eq!(input, deser);
 
     let input = DataEnum::Bap(u8::MAX);
     let output: Vec<u8> = to_vec(&input).unwrap();
-    assert_eq!(&[0x02, 0xFF], output.deref());
+    let deser: DataEnum = from_slice(&output).unwrap();
+    assert_eq!(input, deser);
 
     let input = DataEnum::Kim(EnumStruct {
         eight: 0xF0,

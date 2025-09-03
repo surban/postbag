@@ -198,9 +198,14 @@ where
         self,
         _name: &'static str,
         variant_index: u32,
-        _variant: &'static str,
+        variant: &'static str,
     ) -> Result<()> {
-        self.write_u32(variant_index)
+        if CFG::with_identifiers() {
+            variant.serialize(&mut *self)?;
+        } else {
+            self.write_u32(variant_index)?;
+        }
+        Ok(())
     }
 
     fn serialize_newtype_struct<T>(self, _name: &'static str, value: &T) -> Result<()>
@@ -214,14 +219,20 @@ where
         self,
         _name: &'static str,
         variant_index: u32,
-        _variant: &'static str,
+        variant: &'static str,
         value: &T,
     ) -> Result<()>
     where
         T: ?Sized + Serialize,
     {
-        self.write_u32(variant_index)?;
-        value.serialize(self)
+        if CFG::with_identifiers() {
+            variant.serialize(&mut *self)?;
+        } else {
+            self.write_u32(variant_index)?;
+        }
+        value.serialize(self)?;
+
+        Ok(())
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq> {
@@ -245,10 +256,15 @@ where
         self,
         _name: &'static str,
         variant_index: u32,
-        _variant: &'static str,
+        variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeTupleVariant> {
-        self.write_u32(variant_index)?;
+        if CFG::with_identifiers() {
+            variant.serialize(&mut *self)?;
+        } else {
+            self.write_u32(variant_index)?;
+        }
+
         Ok(self)
     }
 
@@ -266,10 +282,15 @@ where
         self,
         _name: &'static str,
         variant_index: u32,
-        _variant: &'static str,
+        variant: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStructVariant> {
-        self.write_u32(variant_index)?;
+        if CFG::with_identifiers() {
+            variant.serialize(&mut *self)?;
+        } else {
+            self.write_u32(variant_index)?;
+        }
+
         self.write_usize(len)?;
         Ok(self)
     }

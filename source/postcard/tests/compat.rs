@@ -46,13 +46,13 @@ fn changed_struct_variant_fields() {
 
     #[derive(Serialize, Deserialize)]
     enum B {
-        V1,
+        V1a,
+        V3b,
         V2 {
             f2: u32,
             #[serde(default = "f4_default")]
             f4: u32,
-        },
-        V3,
+        },        
     }
 
     const fn f4_default() -> u32 {
