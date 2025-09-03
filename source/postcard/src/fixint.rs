@@ -166,7 +166,7 @@ mod tests {
         let input = DefinitelyLE { x: 0xABCD };
         let serialized = crate::to_vec(&input).unwrap();
 
-        let deserialized: DefinitelyLE = crate::from_bytes(&serialized).unwrap();
+        let deserialized: DefinitelyLE = crate::from_slice(&serialized).unwrap();
         assert_eq!(deserialized, input);
     }
 
@@ -181,7 +181,7 @@ mod tests {
         let input = DefinitelyBE { x: 0xABCD };
         let serialized = crate::to_vec(&input).unwrap();
 
-        let deserialized: DefinitelyBE = crate::from_bytes(&serialized).unwrap();
+        let deserialized: DefinitelyBE = crate::from_slice(&serialized).unwrap();
         assert_eq!(deserialized, input);
     }
 }

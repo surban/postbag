@@ -1,4 +1,4 @@
-use postcard::{from_bytes, to_vec};
+use postcard::{from_slice, to_vec};
 use serde::{Deserialize, Serialize};
 
 #[test]
@@ -29,7 +29,7 @@ fn changed_fields() {
 
     let data = to_vec(&a).unwrap();
 
-    let b: B = from_bytes(&data).unwrap();
+    let b: B = from_slice(&data).unwrap();
 
     assert_eq!(b.f2, a.f2);
     assert_eq!(b.f4, f4_default());

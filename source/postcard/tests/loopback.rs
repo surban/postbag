@@ -3,7 +3,7 @@ use core::fmt::Write;
 use core::ops::Deref;
 
 use postcard::Error;
-use postcard::from_bytes;
+use postcard::from_slice;
 use postcard::to_vec;
 
 use serde::de::DeserializeOwned;
@@ -134,7 +134,7 @@ where
     let mut x: ::std::vec::Vec<u8> = vec![];
     x.extend(serialized.deref().iter().cloned());
     {
-        let deserialized: T = from_bytes(&x).unwrap();
+        let deserialized: T = from_slice(&x).unwrap();
         assert_eq!(data, deserialized);
     }
 }
@@ -171,9 +171,9 @@ fn std_io_loopback() {
 fn varint_boundary_canon() {
     let x = u32::MAX;
     let used = crate::to_vec(&x).unwrap();
-    let deser: u32 = crate::from_bytes(&used).unwrap();
+    let deser: u32 = crate::from_slice(&used).unwrap();
     assert_eq!(deser, u32::MAX);
-    let deser: postcard::Result<u32> = crate::from_bytes(&[0xFF, 0xFF, 0xFF, 0xFF, 0x1F]);
+    let deser: postcard::Result<u32> = crate::from_slice(&[0xFF, 0xFF, 0xFF, 0xFF, 0x1F]);
     assert!(matches!(deser, Err(crate::Error::DeserializeBadVarint)));
 }
 
@@ -181,6 +181,6 @@ fn varint_boundary_canon() {
 fn signed_int128() {
     let x = -19490127978232325886905073712831_i128;
     let used = crate::to_vec(&x).unwrap();
-    let deser: i128 = crate::from_bytes(&used).unwrap();
+    let deser: i128 = crate::from_slice(&used).unwrap();
     assert_eq!(deser, x);
 }

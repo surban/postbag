@@ -5,7 +5,7 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 
 // use postcard::varint::{varint_max, varint_usize};
-use postcard::{from_bytes, to_vec};
+use postcard::{from_slice, to_vec};
 
 #[test]
 fn ser_u8() {
@@ -65,7 +65,7 @@ fn ser_struct_unsigned() {
         tt: 0xACAC_ACAC,
     };
     let output: Vec<u8> = to_vec(&input).unwrap();
-    let deser: BasicU8S = from_bytes(&output).unwrap();
+    let deser: BasicU8S = from_slice(&output).unwrap();
 
     assert_eq!(input, deser);
 }
@@ -164,7 +164,7 @@ fn enums() {
         sixt: 0xACAC,
     });
     let output: Vec<u8> = to_vec(&input).unwrap();
-    let deser: DataEnum = from_bytes(&output).unwrap();
+    let deser: DataEnum = from_slice(&output).unwrap();
     assert_eq!(input, deser);
 
     let input = DataEnum::Chi {
@@ -232,7 +232,7 @@ fn ref_struct() {
         str_s: message.to_string(),
     };
     let output: Vec<u8> = to_vec(&input).unwrap();
-    let deser: RefStruct = from_bytes(&output).unwrap();
+    let deser: RefStruct = from_slice(&output).unwrap();
     assert_eq!(input, deser);
 }
 

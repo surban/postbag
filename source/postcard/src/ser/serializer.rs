@@ -465,10 +465,14 @@ where
     where
         T: ?Sized + Serialize,
     {
-        key.serialize(&mut **self)?;
+        if CFG::with_identifiers() {
+            key.serialize(&mut **self)?;
+        }
+
         self.output.start_skippable();
         value.serialize(&mut **self)?;
         self.output.end_skippable()?;
+
         Ok(())
     }
 

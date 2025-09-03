@@ -35,14 +35,7 @@ where
     }
 }
 
-impl<'de> Deserializer<'de, &'de [u8]> {
-    /// Obtain a Deserializer from a slice of bytes
-    pub fn from_slice(input: &'de [u8]) -> Self {
-        Self::new(input)
-    }
-}
-
-impl<'de, R: Read> Deserializer<'de, R> {
+impl<'de, R: Read, CFG: Cfg> Deserializer<'de, R, CFG> {
     fn try_take_varint_usize(&mut self) -> Result<usize> {
         let value = self.try_take_varint_u64()?;
         usize::try_from(value).map_err(|_| Error::UsizeOverflow)
@@ -121,12 +114,12 @@ impl<'de, R: Read> Deserializer<'de, R> {
     }
 }
 
-struct SeqAccess<'a, 'b, R> {
-    deserializer: &'a mut Deserializer<'b, R>,
+struct SeqAccess<'a, 'b, R, CFG> {
+    deserializer: &'a mut Deserializer<'b, R, CFG>,
     len: usize,
 }
 
-impl<'a, 'b: 'a, R: Read> serde::de::SeqAccess<'b> for SeqAccess<'a, 'b, R> {
+impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::SeqAccess<'b> for SeqAccess<'a, 'b, R, CFG> {
     type Error = Error;
 
     fn next_element_seed<V: DeserializeSeed<'b>>(&mut self, seed: V) -> Result<Option<V::Value>> {
@@ -144,12 +137,12 @@ impl<'a, 'b: 'a, R: Read> serde::de::SeqAccess<'b> for SeqAccess<'a, 'b, R> {
     }
 }
 
-struct StructFieldAccess<'a, 'b, R> {
-    deserializer: &'a mut Deserializer<'b, R>,
+struct StructFieldAccess<'a, 'b, R, CFG> {
+    deserializer: &'a mut Deserializer<'b, R, CFG>,
     len: usize,
 }
 
-impl<'a, 'b: 'a, R: Read> serde::de::MapAccess<'b> for StructFieldAccess<'a, 'b, R> {
+impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::MapAccess<'b> for StructFieldAccess<'a, 'b, R, CFG> {
     type Error = Error;
 
     fn next_key_seed<K: DeserializeSeed<'b>>(&mut self, seed: K) -> Result<Option<K::Value>> {
@@ -174,12 +167,12 @@ impl<'a, 'b: 'a, R: Read> serde::de::MapAccess<'b> for StructFieldAccess<'a, 'b,
     }
 }
 
-struct MapAccess<'a, 'b, R> {
-    deserializer: &'a mut Deserializer<'b, R>,
+struct MapAccess<'a, 'b, R, CFG> {
+    deserializer: &'a mut Deserializer<'b, R, CFG>,
     len: usize,
 }
 
-impl<'a, 'b: 'a, R: Read> serde::de::MapAccess<'b> for MapAccess<'a, 'b, R> {
+impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::MapAccess<'b> for MapAccess<'a, 'b, R, CFG> {
     type Error = Error;
 
     fn next_key_seed<K: DeserializeSeed<'b>>(&mut self, seed: K) -> Result<Option<K::Value>> {
@@ -203,7 +196,7 @@ impl<'a, 'b: 'a, R: Read> serde::de::MapAccess<'b> for MapAccess<'a, 'b, R> {
     }
 }
 
-impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
+impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R, CFG> {
     type Error = Error;
 
     fn is_human_readable(&self) -> bool {
@@ -477,10 +470,15 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
         V: Visitor<'de>,
     {
         let len = self.try_take_varint_usize()?;
-        visitor.visit_map(StructFieldAccess {
-            deserializer: self,
-            len,
-        })
+
+        if CFG::with_identifiers() {
+            visitor.visit_map(StructFieldAccess {
+                deserializer: self,
+                len,
+            })
+        } else {
+            self.deserialize_tuple(len, visitor)
+        }
     }
 
     fn deserialize_enum<V>(
@@ -515,7 +513,7 @@ impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<'de, R> {
     }
 }
 
-impl<'de, R: Read> serde::de::VariantAccess<'de> for &mut Deserializer<'de, R> {
+impl<'de, R: Read, CFG: Cfg> serde::de::VariantAccess<'de> for &mut Deserializer<'de, R, CFG> {
     type Error = Error;
 
     fn unit_variant(self) -> Result<()> {
@@ -539,7 +537,7 @@ impl<'de, R: Read> serde::de::VariantAccess<'de> for &mut Deserializer<'de, R> {
     }
 }
 
-impl<'de, R: Read> serde::de::EnumAccess<'de> for &mut Deserializer<'de, R> {
+impl<'de, R: Read, CFG: Cfg> serde::de::EnumAccess<'de> for &mut Deserializer<'de, R, CFG> {
     type Error = Error;
     type Variant = Self;
 

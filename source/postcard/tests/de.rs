@@ -1,6 +1,6 @@
 use core::fmt::Write;
 use core::ops::Deref;
-use postcard::{Error, from_bytes, to_vec};
+use postcard::{Error, from_slice, to_vec};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{collections::BTreeMap, io::ErrorKind};
 
@@ -9,7 +9,7 @@ fn de_u8() {
     let output: Vec<u8> = to_vec(&0x05u8).unwrap();
     assert_eq!(&[5], output.deref());
 
-    let out: u8 = from_bytes(output.deref()).unwrap();
+    let out: u8 = from_slice(output.deref()).unwrap();
     assert_eq!(out, 0x05);
 }
 
@@ -18,7 +18,7 @@ fn de_u16() {
     let output: Vec<u8> = to_vec(&0xA5C7u16).unwrap();
     assert_eq!(&[0xC7, 0xCB, 0x02], output.deref());
 
-    let out: u16 = from_bytes(output.deref()).unwrap();
+    let out: u16 = from_slice(output.deref()).unwrap();
     assert_eq!(out, 0xA5C7);
 }
 
@@ -27,7 +27,7 @@ fn de_u32() {
     let output: Vec<u8> = to_vec(&0xCDAB3412u32).unwrap();
     assert_eq!(&[0x92, 0xE8, 0xAC, 0xED, 0x0C], output.deref());
 
-    let out: u32 = from_bytes(output.deref()).unwrap();
+    let out: u32 = from_slice(output.deref()).unwrap();
     assert_eq!(out, 0xCDAB3412u32);
 }
 
@@ -39,7 +39,7 @@ fn de_u64() {
         output.deref()
     );
 
-    let out: u64 = from_bytes(output.deref()).unwrap();
+    let out: u64 = from_slice(output.deref()).unwrap();
     assert_eq!(out, 0x1234_5678_90AB_CDEFu64);
 }
 
@@ -54,7 +54,7 @@ fn de_u128() {
         output.deref()
     );
 
-    let out: u128 = from_bytes(output.deref()).unwrap();
+    let out: u128 = from_slice(output.deref()).unwrap();
     assert_eq!(out, 0x1234_5678_90AB_CDEF_1234_5678_90AB_CDEFu128);
 }
 
@@ -79,7 +79,7 @@ fn de_struct_unsigned() {
 
     let output: std::vec::Vec<u8> = to_vec(&data).unwrap();
 
-    let out: BasicU8S = from_bytes(output.deref()).unwrap();
+    let out: BasicU8S = from_slice(output.deref()).unwrap();
     assert_eq!(out, data);
 }
 
@@ -92,7 +92,7 @@ fn de_byte_slice() {
         output.deref()
     );
 
-    let out: Vec<u8> = from_bytes(output.deref()).unwrap();
+    let out: Vec<u8> = from_slice(output.deref()).unwrap();
     assert_eq!(input, out.deref());
 
     let mut input: Vec<u8> = Vec::new();
@@ -107,7 +107,7 @@ fn de_byte_slice() {
         assert_eq!((i & 0xFF) as u8, *val);
     }
 
-    let de: Vec<u8> = from_bytes(output.deref()).unwrap();
+    let de: Vec<u8> = from_slice(output.deref()).unwrap();
     assert_eq!(input.deref(), de.deref());
 }
 
@@ -130,7 +130,7 @@ fn de_str() {
         assert_eq!("abcd", core::str::from_utf8(ch).unwrap());
     }
 
-    let de: String = from_bytes(output.deref()).unwrap();
+    let de: String = from_slice(output.deref()).unwrap();
     assert_eq!(input.deref(), de.deref());
 }
 
@@ -162,7 +162,7 @@ enum DataEnum {
 fn enums() {
     let output: Vec<u8> = to_vec(&BasicEnum::Bim).unwrap();
     assert_eq!(&[0x01], output.deref());
-    let out: BasicEnum = from_bytes(output.deref()).unwrap();
+    let out: BasicEnum = from_slice(output.deref()).unwrap();
     assert_eq!(out, BasicEnum::Bim);
 
     let output: Vec<u8> = to_vec(&DataEnum::Bim(u64::MAX)).unwrap();
@@ -175,12 +175,12 @@ fn enums() {
 
     let output: Vec<u8> = to_vec(&DataEnum::Bib(u16::MAX)).unwrap();
     assert_eq!(&[0x00, 0xFF, 0xFF, 0x03], output.deref());
-    let out: DataEnum = from_bytes(output.deref()).unwrap();
+    let out: DataEnum = from_slice(output.deref()).unwrap();
     assert_eq!(out, DataEnum::Bib(u16::MAX));
 
     let output: Vec<u8> = to_vec(&DataEnum::Bap(u8::MAX)).unwrap();
     assert_eq!(&[0x02, 0xFF], output.deref());
-    let out: DataEnum = from_bytes(output.deref()).unwrap();
+    let out: DataEnum = from_slice(output.deref()).unwrap();
     assert_eq!(out, DataEnum::Bap(u8::MAX));
 
     let output: std::vec::Vec<u8> = to_vec(&DataEnum::Kim(EnumStruct {
@@ -188,7 +188,7 @@ fn enums() {
         sixt: 0xACAC,
     }))
     .unwrap();
-    let out: DataEnum = from_bytes(output.deref()).unwrap();
+    let out: DataEnum = from_slice(output.deref()).unwrap();
     assert_eq!(
         out,
         DataEnum::Kim(EnumStruct {
@@ -202,7 +202,7 @@ fn enums() {
         b: 0xC7C7C7C7,
     })
     .unwrap();
-    let out: DataEnum = from_bytes(output.deref()).unwrap();
+    let out: DataEnum = from_slice(output.deref()).unwrap();
     assert_eq!(
         out,
         DataEnum::Chi {
@@ -213,7 +213,7 @@ fn enums() {
 
     let output: Vec<u8> = to_vec(&DataEnum::Sho(0x6969, 0x07)).unwrap();
     assert_eq!(&[0x05, 0xE9, 0xD2, 0x01, 0x07], output.deref());
-    let out: DataEnum = from_bytes(output.deref()).unwrap();
+    let out: DataEnum = from_slice(output.deref()).unwrap();
     assert_eq!(out, DataEnum::Sho(0x6969, 0x07));
 }
 
@@ -224,7 +224,7 @@ fn tuples() {
         &[1u8, 0x0A, 0x06, b'H', b'e', b'l', b'l', b'o', b'!'],
         output.deref()
     );
-    let out: (u8, u32, std::string::String) = from_bytes(&output).unwrap();
+    let out: (u8, u32, std::string::String) = from_slice(&output).unwrap();
     assert_eq!(out, (1u8, 10u32, "Hello!".to_string()));
 }
 
@@ -262,13 +262,13 @@ fn bytes() {
     let x: &[u8; 32] = &[0u8; 32];
     let output: Vec<u8> = to_vec(x).unwrap();
     assert_eq!(output.len(), 32);
-    let out: [u8; 32] = from_bytes(output.deref()).unwrap();
+    let out: [u8; 32] = from_slice(output.deref()).unwrap();
     assert_eq!(out, [0u8; 32]);
 
     let x: &[u8] = &[0u8; 32];
     let output: Vec<u8> = to_vec(x).unwrap();
     assert_eq!(output.len(), 33);
-    let out: std::vec::Vec<u8> = from_bytes(output.deref()).unwrap();
+    let out: std::vec::Vec<u8> = from_slice(output.deref()).unwrap();
     assert_eq!(out, [0u8; 32]);
 
     let x = ByteSliceStruct {
@@ -276,7 +276,7 @@ fn bytes() {
     };
     let output: Vec<u8> = to_vec(&x).unwrap();
     assert_eq!(output.len(), 33);
-    let out: ByteSliceStruct = from_bytes(output.deref()).unwrap();
+    let out: ByteSliceStruct = from_slice(output.deref()).unwrap();
     assert_eq!(
         out,
         ByteSliceStruct {
@@ -290,7 +290,7 @@ fn chars() {
     let x: char = 'a';
     let output: Vec<u8> = to_vec(&x).unwrap();
     assert_eq!(output.len(), 2);
-    let out: char = from_bytes(output.deref()).unwrap();
+    let out: char = from_slice(output.deref()).unwrap();
     assert_eq!(out, 'a');
 }
 
@@ -307,17 +307,17 @@ pub struct DualTupleStruct(u8, u16);
 fn structs() {
     let output: Vec<u8> = to_vec(&NewTypeStruct(5)).unwrap();
     assert_eq!(&[0x05], output.deref());
-    let out: NewTypeStruct = from_bytes(output.deref()).unwrap();
+    let out: NewTypeStruct = from_slice(output.deref()).unwrap();
     assert_eq!(out, NewTypeStruct(5));
 
     let output: Vec<u8> = to_vec(&TupleStruct((0xA0, 0x1234))).unwrap();
     assert_eq!(&[0xA0, 0xB4, 0x24], output.deref());
-    let out: TupleStruct = from_bytes(output.deref()).unwrap();
+    let out: TupleStruct = from_slice(output.deref()).unwrap();
     assert_eq!(out, TupleStruct((0xA0, 0x1234)));
 
     let output: Vec<u8> = to_vec(&DualTupleStruct(0xA0, 0x1234)).unwrap();
     assert_eq!(&[0xA0, 0xB4, 0x24], output.deref());
-    let out: DualTupleStruct = from_bytes(output.deref()).unwrap();
+    let out: DualTupleStruct = from_slice(output.deref()).unwrap();
     assert_eq!(out, DualTupleStruct(0xA0, 0x1234));
 }
 
@@ -337,7 +337,7 @@ fn ref_struct() {
     })
     .unwrap();
 
-    let out: RefStruct = from_bytes(output.deref()).unwrap();
+    let out: RefStruct = from_slice(output.deref()).unwrap();
     assert_eq!(
         out,
         RefStruct {
@@ -351,7 +351,7 @@ fn ref_struct() {
 fn unit() {
     let output: Vec<u8> = to_vec(&()).unwrap();
     assert_eq!(output.len(), 0);
-    let _: () = from_bytes(output.deref()).unwrap();
+    let _: () = from_slice(output.deref()).unwrap();
 }
 
 #[test]
@@ -360,14 +360,14 @@ fn heapless_data() {
     input.extend_from_slice(&[0x01, 0x02, 0x03, 0x04]);
     let output: Vec<u8> = to_vec(&input).unwrap();
     assert_eq!(&[0x04, 0x01, 0x02, 0x03, 0x04], output.deref());
-    let out: Vec<u8> = from_bytes(output.deref()).unwrap();
+    let out: Vec<u8> = from_slice(output.deref()).unwrap();
     assert_eq!(out, input);
 
     let mut input: String = String::new();
     write!(&mut input, "helLO!").unwrap();
     let output: Vec<u8> = to_vec(&input).unwrap();
     assert_eq!(&[0x06, b'h', b'e', b'l', b'L', b'O', b'!'], output.deref());
-    let out: String = from_bytes(output.deref()).unwrap();
+    let out: String = from_slice(output.deref()).unwrap();
     assert_eq!(input, out);
 
     let mut input: BTreeMap<u8, u8> = BTreeMap::new();
@@ -380,7 +380,7 @@ fn heapless_data() {
         &[0x04, 0x01, 0x05, 0x02, 0x06, 0x03, 0x07, 0x04, 0x08],
         output.deref()
     );
-    let out: BTreeMap<u8, u8> = from_bytes(output.deref()).unwrap();
+    let out: BTreeMap<u8, u8> = from_slice(output.deref()).unwrap();
     assert_eq!(input, out);
 }
 
@@ -392,12 +392,12 @@ fn zst_vec() {
     let input = vec![ZSTStruct, ZSTStruct, ZSTStruct];
     let serialized = to_vec(&input).unwrap();
     dbg!(&serialized);
-    assert_eq!(from_bytes::<Vec<ZSTStruct>>(&serialized).unwrap(), input);
+    assert_eq!(from_slice::<Vec<ZSTStruct>>(&serialized).unwrap(), input);
 
     let input = vec![ZSTStruct, ZSTStruct, ZSTStruct, ZSTStruct];
     let serialized = to_vec(&input).unwrap();
     dbg!(&serialized);
-    assert_eq!(from_bytes::<Vec<ZSTStruct>>(&serialized).unwrap(), input);
+    assert_eq!(from_slice::<Vec<ZSTStruct>>(&serialized).unwrap(), input);
 }
 
 #[test]
@@ -405,12 +405,12 @@ fn vec() {
     let input = vec![255, 255, 255, 0, 0, 0, 0, 0];
     let serialized = to_vec(&input).unwrap();
     dbg!(&serialized);
-    assert_eq!(from_bytes::<Vec<u8>>(&serialized).unwrap(), input);
+    assert_eq!(from_slice::<Vec<u8>>(&serialized).unwrap(), input);
 
     // This won't actually prove anything since tests will likely always be
     // run on devices with larger amounts of memory, but it can't hurt.
     assert!(matches!(
-        from_bytes::<Vec<u8>>(&[(1 << 7) | 8, 255, 255, 255, 0, 0, 0, 0, 0]),
+        from_slice::<Vec<u8>>(&[(1 << 7) | 8, 255, 255, 255, 0, 0, 0, 0, 0]),
         Err(Error::Io(io)) if io.kind() == ErrorKind::UnexpectedEof
     ));
 }
