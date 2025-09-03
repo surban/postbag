@@ -52,7 +52,7 @@ fn changed_struct_variant_fields() {
             f2: u32,
             #[serde(default = "f4_default")]
             f4: u32,
-        },        
+        },
     }
 
     const fn f4_default() -> u32 {
