@@ -38,6 +38,4 @@ impl Default for Cfg {
 }
 
 #[cfg(test)]
-mod test {
-
-}
+mod test {}

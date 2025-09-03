@@ -1,4 +1,4 @@
-use serde::{ser, Serialize};
+use serde::{Serialize, ser};
 use std::io::Write;
 
 use crate::varint::*;

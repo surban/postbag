@@ -4,8 +4,8 @@ use std::io::Read;
 use std::mem;
 
 use crate::{
-    varint::{max_of_last_byte, varint_max},
     Error, Result,
+    varint::{max_of_last_byte, varint_max},
 };
 
 /// Reader that allows blocks to be (partially) skipped.

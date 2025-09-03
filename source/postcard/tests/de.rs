@@ -1,10 +1,8 @@
-
-
 use core::fmt::Write;
 use core::ops::Deref;
 use postcard::{Error, from_bytes, to_vec};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, io::ErrorKind};
 
 #[test]
 fn de_u8() {
@@ -169,7 +167,9 @@ fn enums() {
 
     let output: Vec<u8> = to_vec(&DataEnum::Bim(u64::MAX)).unwrap();
     assert_eq!(
-        &[0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01],
+        &[
+            0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01
+        ],
         output.deref()
     );
 
@@ -407,12 +407,10 @@ fn vec() {
     dbg!(&serialized);
     assert_eq!(from_bytes::<Vec<u8>>(&serialized).unwrap(), input);
 
-    dbg!(from_bytes::<Vec<u8>>(&[(1 << 7) | 8, 255, 255, 255, 0, 0, 0, 0, 0]));
-
     // This won't actually prove anything since tests will likely always be
     // run on devices with larger amounts of memory, but it can't hurt.
     assert!(matches!(
         from_bytes::<Vec<u8>>(&[(1 << 7) | 8, 255, 255, 255, 0, 0, 0, 0, 0]),
-        Err(Error::Io(io)) && io.kind == ErrorKind::UnexpectedEof
+        Err(Error::Io(io)) if io.kind() == ErrorKind::UnexpectedEof
     ));
 }

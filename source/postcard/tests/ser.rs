@@ -112,8 +112,6 @@ fn ser_str() {
     }
 }
 
-
-
 #[allow(dead_code)]
 #[derive(Serialize)]
 enum BasicEnum {
@@ -147,7 +145,9 @@ fn enums() {
     let input = DataEnum::Bim(u64::MAX);
     let output: Vec<u8> = to_vec(&input).unwrap();
     assert_eq!(
-        &[0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01],
+        &[
+            0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01
+        ],
         output.deref()
     );
 

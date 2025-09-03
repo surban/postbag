@@ -1,12 +1,10 @@
-use serde::de::{self, value::U32Deserializer, DeserializeSeed, IntoDeserializer, Visitor};
+use serde::de::{self, DeserializeSeed, IntoDeserializer, Visitor, value::U32Deserializer};
 
-use crate::de::{
-    skippable::SkipRead,
-};
+use crate::de::skippable::SkipRead;
 use crate::error::{Error, Result};
 use crate::varint::{max_of_last_byte, varint_max};
 use core::marker::PhantomData;
-use std::io::{Cursor, Read};
+use std::io::Read;
 
 /// A `serde` compatible deserializer, generic over “Flavors” of deserializing plugins.
 ///

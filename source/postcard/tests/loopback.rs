@@ -2,9 +2,9 @@ use core::fmt::Debug;
 use core::fmt::Write;
 use core::ops::Deref;
 
+use postcard::Error;
 use postcard::from_bytes;
 use postcard::to_vec;
-use postcard::Error;
 
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
