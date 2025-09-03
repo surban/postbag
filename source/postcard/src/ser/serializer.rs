@@ -74,9 +74,10 @@ impl<W: Write, CFG: Cfg> Serializer<W, CFG> {
     }
 }
 
-impl<W> ser::Serializer for &mut Serializer<W>
+impl<W, CFG> ser::Serializer for &mut Serializer<W, CFG>
 where
     W: Write,
+    CFG: Cfg,
 {
     type Ok = ();
 
@@ -341,9 +342,10 @@ where
     }
 }
 
-impl<W> ser::SerializeSeq for &mut Serializer<W>
+impl<W, CFG> ser::SerializeSeq for &mut Serializer<W, CFG>
 where
     W: Write,
+    CFG: Cfg,
 {
     // Must match the `Ok` type of the serializer.
     type Ok = ();
@@ -364,9 +366,10 @@ where
     }
 }
 
-impl<W> ser::SerializeTuple for &mut Serializer<W>
+impl<W, CFG> ser::SerializeTuple for &mut Serializer<W, CFG>
 where
     W: Write,
+    CFG: Cfg,
 {
     type Ok = ();
     type Error = Error;
@@ -383,9 +386,10 @@ where
     }
 }
 
-impl<W> ser::SerializeTupleStruct for &mut Serializer<W>
+impl<W, CFG> ser::SerializeTupleStruct for &mut Serializer<W, CFG>
 where
     W: Write,
+    CFG: Cfg,
 {
     type Ok = ();
     type Error = Error;
@@ -402,9 +406,10 @@ where
     }
 }
 
-impl<W> ser::SerializeTupleVariant for &mut Serializer<W>
+impl<W, CFG> ser::SerializeTupleVariant for &mut Serializer<W, CFG>
 where
     W: Write,
+    CFG: Cfg,
 {
     type Ok = ();
     type Error = Error;
@@ -421,9 +426,10 @@ where
     }
 }
 
-impl<W> ser::SerializeMap for &mut Serializer<W>
+impl<W, CFG> ser::SerializeMap for &mut Serializer<W, CFG>
 where
     W: Write,
+    CFG: Cfg,
 {
     type Ok = ();
     type Error = Error;
@@ -447,9 +453,10 @@ where
     }
 }
 
-impl<W> ser::SerializeStruct for &mut Serializer<W>
+impl<W, CFG> ser::SerializeStruct for &mut Serializer<W, CFG>
 where
     W: Write,
+    CFG: Cfg,
 {
     type Ok = ();
     type Error = Error;
@@ -470,9 +477,10 @@ where
     }
 }
 
-impl<W> ser::SerializeStructVariant for &mut Serializer<W>
+impl<W, CFG> ser::SerializeStructVariant for &mut Serializer<W, CFG>
 where
     W: Write,
+    CFG: Cfg,
 {
     type Ok = ();
     type Error = Error;

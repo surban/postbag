@@ -1,7 +1,7 @@
 use serde::Serialize;
 
-use crate::error::Result;
 use crate::ser::serializer::Serializer;
+use crate::{cfg::DefaultCfg, error::Result};
 
 pub(crate) mod serializer;
 pub(crate) mod skippable;
@@ -19,8 +19,6 @@ pub(crate) mod skippable;
 /// let ser: Vec<u8> = to_vec("Hi!").unwrap();
 /// assert_eq!(ser.as_slice(), &[0x03, b'H', b'i', b'!']);
 /// ```
-#[cfg_attr(docsrs, doc(cfg(feature = "use-std")))]
-
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>>
 where
     T: Serialize + ?Sized,
@@ -45,7 +43,7 @@ where
     T: Serialize + ?Sized,
     W: std::io::Write,
 {
-    let mut serializer = Serializer::new(writer);
+    let mut serializer = Serializer::<W, DefaultCfg>::new(writer);
     value.serialize(&mut serializer)?;
     serializer.finalize()
 }
