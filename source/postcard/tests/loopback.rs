@@ -4,6 +4,7 @@ use core::ops::Deref;
 
 use postcard::from_bytes;
 use postcard::to_vec;
+use postcard::Error;
 
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -52,7 +53,6 @@ struct RefStruct<'a> {
     str_s: &'a str,
 }
 
-#[cfg(feature = "heapless")]
 #[test]
 fn loopback() {
     // Basic types
@@ -122,11 +122,9 @@ fn loopback() {
     test_one(input);
 
     // `CString` (uses `serialize_bytes`/`deserialize_byte_buf`)
-    #[cfg(feature = "use-std")]
     test_one(std::ffi::CString::new("heLlo").unwrap());
 }
 
-#[cfg(feature = "heapless")]
 #[track_caller]
 fn test_one<T>(data: T)
 where
@@ -141,7 +139,6 @@ where
     }
 }
 
-#[cfg(feature = "use-std")]
 #[test]
 fn std_io_loopback() {
     use postcard::from_io;
@@ -168,4 +165,22 @@ fn std_io_loopback() {
         sf: 0x1234_4321_ABCD_DCBA,
         tt: 0xACAC_ACAC,
     });
+}
+
+#[test]
+fn varint_boundary_canon() {
+    let x = u32::MAX;
+    let used = crate::to_vec(&x).unwrap();
+    let deser: u32 = crate::from_bytes(&used).unwrap();
+    assert_eq!(deser, u32::MAX);
+    let deser: postcard::Result<u32> = crate::from_bytes(&[0xFF, 0xFF, 0xFF, 0xFF, 0x1F]);
+    assert!(matches!(deser, Err(crate::Error::DeserializeBadVarint)));
+}
+
+#[test]
+fn signed_int128() {
+    let x = -19490127978232325886905073712831_i128;
+    let used = crate::to_vec(&x).unwrap();
+    let deser: i128 = crate::from_bytes(&used).unwrap();
+    assert_eq!(deser, x);
 }

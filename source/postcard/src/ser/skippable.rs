@@ -1,86 +1,88 @@
 //! Skippable blocks writer.
 
-use core::mem;
+use std::io::Result;
+use std::io::Write;
+use std::mem;
 
-use super::flavors::Flavor;
-use crate::{
-    error::Result,
-    varint::{varint_max, varint_u16},
-};
+use crate::varint::{varint_max, varint_u16};
 
-/// Output with skippable blocks.
-#[allow(private_interfaces)]
-pub enum SkipStack<F: Flavor> {
-    Base(F),
-    SkipBlock(SkipBlock<F>),
-    Dummy,
-}
+/// Writer that allows block to be (partially) skipped during reading.
+pub struct SkipWrite<W>(SkipStack<W>);
 
-impl<F: Flavor> SkipStack<F> {
-    /// Creates a new skip stack.
-    pub fn new(inner: F) -> Self {
-        Self::Base(inner)
+impl<W: Write> SkipWrite<W> {
+    /// Creates a new skip writer.
+    pub fn new(inner: W) -> Self {
+        Self(SkipStack::Base(inner))
     }
 
-    /// Push a single byte to be modified and/or stored.
-    pub fn try_push(&mut self, data: u8) -> Result<()> {
-        self.try_extend(&[data])
-    }
-
-    /// Pushes multiple byte to be modified and/or stored.
-    pub fn try_extend(&mut self, data: &[u8]) -> Result<()> {
-        match self {
-            Self::Base(base) => base.try_extend(data),
-            Self::SkipBlock(sb) => sb.try_extend(data),
-            Self::Dummy => unreachable!(),
-        }
+    /// Write bytes.
+    pub fn write(&mut self, data: &[u8]) -> Result<()> {
+        self.0.write(data)
     }
 
     /// Opens a skippable block.
     ///
     /// Must be paired with a call to [`Self::end_skippable`].
     pub fn start_skippable(&mut self) {
-        let this = mem::replace(self, Self::Dummy);
-        *self = Self::SkipBlock(SkipBlock::new(this));
+        let this = mem::replace(&mut self.0, SkipStack::Dummy);
+        self.0 = SkipStack::SkipBlock(SkipBlock::new(this));
     }
 
     /// Finishes a skippable block.
     pub fn end_skippable(&mut self) -> Result<()> {
-        let this = mem::replace(self, Self::Dummy);
-        match this {
-            Self::Base(_) => panic!("no skip block is open"),
-            Self::SkipBlock(sb) => *self = sb.finish()?,
-            Self::Dummy => unreachable!(),
+        match mem::replace(&mut self.0, SkipStack::Dummy) {
+            SkipStack::Base(_) => panic!("no skip block is open"),
+            SkipStack::SkipBlock(sb) => self.0 = sb.finish()?,
+            SkipStack::Dummy => unreachable!(),
         }
         Ok(())
     }
 
-    /// Returns the contained base flavor.
-    pub fn into_inner(self) -> F {
+    /// Returns the contained writer after flushing it.
+    pub fn into_inner(self) -> Result<W> {
+        match self.0 {
+            SkipStack::Base(mut inner) => {
+                inner.flush()?;
+                Ok(inner)
+            }
+            SkipStack::SkipBlock(_) => panic!("at least one skip block is still open"),
+            SkipStack::Dummy => unreachable!(),
+        }
+    }
+}
+
+enum SkipStack<W> {
+    Base(W),
+    SkipBlock(SkipBlock<W>),
+    Dummy,
+}
+
+impl<W: Write> SkipStack<W> {
+    fn write(&mut self, data: &[u8]) -> Result<()> {
         match self {
-            Self::Base(base) => base,
-            Self::SkipBlock(_) => panic!("at least one skip block is still open"),
+            Self::Base(inner) => inner.write_all(data),
+            Self::SkipBlock(sb) => sb.write(data),
             Self::Dummy => unreachable!(),
         }
     }
 }
 
-struct SkipBlock<F: Flavor> {
-    inner: Box<SkipStack<F>>,
+struct SkipBlock<W> {
+    inner: Box<SkipStack<W>>,
     buf: Vec<u8>,
 }
 
-impl<F: Flavor> SkipBlock<F> {
+impl<W: Write> SkipBlock<W> {
     const MAX_LEN: usize = u16::MAX as usize;
 
-    fn new(inner: SkipStack<F>) -> Self {
+    fn new(inner: SkipStack<W>) -> Self {
         Self {
             inner: Box::new(inner),
             buf: Vec::new(),
         }
     }
 
-    pub fn try_extend(&mut self, data: &[u8]) -> Result<()> {
+    fn write(&mut self, data: &[u8]) -> Result<()> {
         self.buf.extend_from_slice(data);
         self.flush_buf_if_required()?;
 
@@ -100,12 +102,12 @@ impl<F: Flavor> SkipBlock<F> {
     fn flush_buf(&mut self) -> Result<()> {
         let mut len_buf = [0; varint_max::<u16>()];
         let len_buf = varint_u16(self.buf.len().try_into().unwrap(), &mut len_buf);
-        self.inner.try_extend(len_buf)?;
+        self.inner.write(len_buf)?;
 
-        self.inner.try_extend(&self.buf)
+        self.inner.write(&self.buf)
     }
 
-    pub fn finish(mut self) -> Result<SkipStack<F>> {
+    fn finish(mut self) -> Result<SkipStack<W>> {
         assert_ne!(self.buf.len(), Self::MAX_LEN);
 
         self.flush_buf()?;

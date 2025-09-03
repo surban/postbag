@@ -1,10 +1,10 @@
 use serde::{ser, Serialize};
+use std::io::Write;
 
-use crate::ser::flavors::Flavor;
 use crate::varint::*;
 use crate::{
     error::{Error, Result},
-    ser::skippable::SkipStack,
+    ser::skippable::SkipWrite,
 };
 
 /// A `serde` compatible serializer, generic over "Flavors" of serializing plugins.
@@ -15,22 +15,20 @@ use crate::{
 /// See the docs for [`SerFlavor`] for more information about "flavors" of serialization
 ///
 /// [`SerFlavor`]: crate::ser_flavors::Flavor
-pub struct Serializer<F>
-where
-    F: Flavor,
-{
+pub struct Serializer<W> {
     /// This is the Flavor(s) that will be used to modify or store any bytes generated
     /// by serialization
-    pub output: SkipStack<F>,
+    pub output: SkipWrite<W>,
 }
 
-impl<F: Flavor> Serializer<F> {
+impl<W: Write> Serializer<W> {
     /// Attempt to push a variably encoded [usize] into the output data stream
     #[inline]
     pub(crate) fn try_push_varint_usize(&mut self, data: usize) -> Result<()> {
         let mut buf = [0u8; varint_max::<usize>()];
         let used_buf = varint_usize(data, &mut buf);
-        self.output.try_extend(used_buf)
+        self.output.write(used_buf)?;
+        Ok(())
     }
 
     /// Attempt to push a variably encoded [u128] into the output data stream
@@ -38,7 +36,8 @@ impl<F: Flavor> Serializer<F> {
     pub(crate) fn try_push_varint_u128(&mut self, data: u128) -> Result<()> {
         let mut buf = [0u8; varint_max::<u128>()];
         let used_buf = varint_u128(data, &mut buf);
-        self.output.try_extend(used_buf)
+        self.output.write(used_buf)?;
+        Ok(())
     }
 
     /// Attempt to push a variably encoded [u64] into the output data stream
@@ -46,7 +45,8 @@ impl<F: Flavor> Serializer<F> {
     pub(crate) fn try_push_varint_u64(&mut self, data: u64) -> Result<()> {
         let mut buf = [0u8; varint_max::<u64>()];
         let used_buf = varint_u64(data, &mut buf);
-        self.output.try_extend(used_buf)
+        self.output.write(used_buf)?;
+        Ok(())
     }
 
     /// Attempt to push a variably encoded [u32] into the output data stream
@@ -54,7 +54,8 @@ impl<F: Flavor> Serializer<F> {
     pub(crate) fn try_push_varint_u32(&mut self, data: u32) -> Result<()> {
         let mut buf = [0u8; varint_max::<u32>()];
         let used_buf = varint_u32(data, &mut buf);
-        self.output.try_extend(used_buf)
+        self.output.write(used_buf)?;
+        Ok(())
     }
 
     /// Attempt to push a variably encoded [u16] into the output data stream
@@ -62,13 +63,14 @@ impl<F: Flavor> Serializer<F> {
     pub(crate) fn try_push_varint_u16(&mut self, data: u16) -> Result<()> {
         let mut buf = [0u8; varint_max::<u16>()];
         let used_buf = varint_u16(data, &mut buf);
-        self.output.try_extend(used_buf)
+        self.output.write(used_buf)?;
+        Ok(())
     }
 }
 
-impl<F> ser::Serializer for &mut Serializer<F>
+impl<W> ser::Serializer for &mut Serializer<W>
 where
-    F: Flavor,
+    W: Write,
 {
     type Ok = ();
 
@@ -132,7 +134,7 @@ where
     #[inline]
     fn serialize_u8(self, v: u8) -> Result<()> {
         self.output
-            .try_push(v)
+            .write(&[v])
             .map_err(|_| Error::SerializeBufferFull)
     }
 
@@ -164,7 +166,7 @@ where
     fn serialize_f32(self, v: f32) -> Result<()> {
         let buf = v.to_bits().to_le_bytes();
         self.output
-            .try_extend(&buf)
+            .write(&buf)
             .map_err(|_| Error::SerializeBufferFull)
     }
 
@@ -172,7 +174,7 @@ where
     fn serialize_f64(self, v: f64) -> Result<()> {
         let buf = v.to_bits().to_le_bytes();
         self.output
-            .try_extend(&buf)
+            .write(&buf)
             .map_err(|_| Error::SerializeBufferFull)
     }
 
@@ -188,7 +190,7 @@ where
         self.try_push_varint_usize(v.len())
             .map_err(|_| Error::SerializeBufferFull)?;
         self.output
-            .try_extend(v.as_bytes())
+            .write(v.as_bytes())
             .map_err(|_| Error::SerializeBufferFull)?;
         Ok(())
     }
@@ -197,9 +199,7 @@ where
     fn serialize_bytes(self, v: &[u8]) -> Result<()> {
         self.try_push_varint_usize(v.len())
             .map_err(|_| Error::SerializeBufferFull)?;
-        self.output
-            .try_extend(v)
-            .map_err(|_| Error::SerializeBufferFull)
+        self.output.write(v).map_err(|_| Error::SerializeBufferFull)
     }
 
     #[inline]
@@ -303,7 +303,8 @@ where
     }
 
     #[inline]
-    fn serialize_struct(self, _name: &'static str, _len: usize) -> Result<Self::SerializeStruct> {
+    fn serialize_struct(self, _name: &'static str, len: usize) -> Result<Self::SerializeStruct> {
+        self.try_push_varint_usize(len)?;
         Ok(self)
     }
 
@@ -364,19 +365,19 @@ where
         self.try_push_varint_usize(len)
             .map_err(|_| Error::SerializeBufferFull)?;
 
-        struct FmtWriter<'a, IF>
+        struct FmtWriter<'a, IW>
         where
-            IF: Flavor,
+            IW: std::io::Write,
         {
-            output: &'a mut SkipStack<IF>,
+            output: &'a mut SkipWrite<IW>,
         }
-        impl<IF> Write for FmtWriter<'_, IF>
+        impl<IW> Write for FmtWriter<'_, IW>
         where
-            IF: Flavor,
+            IW: std::io::Write,
         {
             fn write_str(&mut self, s: &str) -> core::result::Result<(), core::fmt::Error> {
                 self.output
-                    .try_extend(s.as_bytes())
+                    .write(s.as_bytes())
                     .map_err(|_| core::fmt::Error)
             }
         }
@@ -391,9 +392,9 @@ where
     }
 }
 
-impl<F> ser::SerializeSeq for &mut Serializer<F>
+impl<W> ser::SerializeSeq for &mut Serializer<W>
 where
-    F: Flavor,
+    W: Write,
 {
     // Must match the `Ok` type of the serializer.
     type Ok = ();
@@ -416,9 +417,9 @@ where
     }
 }
 
-impl<F> ser::SerializeTuple for &mut Serializer<F>
+impl<W> ser::SerializeTuple for &mut Serializer<W>
 where
-    F: Flavor,
+    W: Write,
 {
     type Ok = ();
     type Error = Error;
@@ -437,9 +438,9 @@ where
     }
 }
 
-impl<F> ser::SerializeTupleStruct for &mut Serializer<F>
+impl<W> ser::SerializeTupleStruct for &mut Serializer<W>
 where
-    F: Flavor,
+    W: Write,
 {
     type Ok = ();
     type Error = Error;
@@ -458,9 +459,9 @@ where
     }
 }
 
-impl<F> ser::SerializeTupleVariant for &mut Serializer<F>
+impl<W> ser::SerializeTupleVariant for &mut Serializer<W>
 where
-    F: Flavor,
+    W: Write,
 {
     type Ok = ();
     type Error = Error;
@@ -479,9 +480,9 @@ where
     }
 }
 
-impl<F> ser::SerializeMap for &mut Serializer<F>
+impl<W> ser::SerializeMap for &mut Serializer<W>
 where
-    F: Flavor,
+    W: Write,
 {
     type Ok = ();
     type Error = Error;
@@ -508,18 +509,19 @@ where
     }
 }
 
-impl<F> ser::SerializeStruct for &mut Serializer<F>
+impl<W> ser::SerializeStruct for &mut Serializer<W>
 where
-    F: Flavor,
+    W: Write,
 {
     type Ok = ();
     type Error = Error;
 
     #[inline]
-    fn serialize_field<T>(&mut self, _key: &'static str, value: &T) -> Result<()>
+    fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<()>
     where
         T: ?Sized + Serialize,
     {
+        key.serialize(&mut **self)?;
         self.output.start_skippable();
         value.serialize(&mut **self)?;
         self.output.end_skippable()?;
@@ -532,9 +534,9 @@ where
     }
 }
 
-impl<F> ser::SerializeStructVariant for &mut Serializer<F>
+impl<W> ser::SerializeStructVariant for &mut Serializer<W>
 where
-    F: Flavor,
+    W: Write,
 {
     type Ok = ();
     type Error = Error;

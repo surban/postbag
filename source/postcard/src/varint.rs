@@ -101,3 +101,30 @@ pub fn varint_u128(n: u128, out: &mut [u8; varint_max::<u128>()]) -> &mut [u8] {
     debug_assert_eq!(value, 0);
     &mut out[..]
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn usize_varint_encode() {
+        let mut buf = [0; varint_max::<usize>()];
+        let res = varint_usize(1, &mut buf);
+
+        assert_eq!(&[1], res);
+
+        let res = varint_usize(usize::MAX, &mut buf);
+
+        //
+        if varint_max::<usize>() == varint_max::<u32>() {
+            assert_eq!(&[0xFF, 0xFF, 0xFF, 0xFF, 0x0F], res);
+        } else if varint_max::<usize>() == varint_max::<u64>() {
+            assert_eq!(
+                &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01],
+                res
+            );
+        } else {
+            panic!("Update this test for 16/128 bit targets!");
+        }
+    }
+}
