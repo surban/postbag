@@ -169,6 +169,216 @@ fn enums_with_data() {
 }
 
 // =============================================================================
+// Nested Structure Tests
+// =============================================================================
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+struct InnerStruct {
+    id: u32,
+    name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+struct OuterStruct {
+    inner: InnerStruct,
+    metadata: Vec<u8>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+struct DeeplyNestedStruct {
+    level1: OuterStruct,
+    extra: u16,
+}
+
+#[test]
+fn nested_structs() {
+    let inner = InnerStruct {
+        id: 42,
+        name: "inner".to_string(),
+    };
+
+    let outer = OuterStruct {
+        inner,
+        metadata: vec![1, 2, 3, 4],
+    };
+
+    loopback(outer);
+
+    // Test deeply nested structs
+    let deeply_nested = DeeplyNestedStruct {
+        level1: OuterStruct {
+            inner: InnerStruct {
+                id: 999,
+                name: "deep".to_string(),
+            },
+            metadata: vec![0xFF, 0xAA, 0x55],
+        },
+        extra: 0x1234,
+    };
+
+    loopback(deeply_nested);
+}
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+enum InnerEnum {
+    Alpha(u8),
+    Beta { x: u16, y: u16 },
+    Gamma,
+}
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+enum OuterEnum {
+    First(InnerEnum),
+    Second { inner: InnerEnum, data: u32 },
+    Third(InnerEnum, InnerEnum),
+}
+
+#[test]
+fn nested_enums() {
+    loopback(OuterEnum::First(InnerEnum::Alpha(42)));
+    loopback(OuterEnum::First(InnerEnum::Beta { x: 100, y: 200 }));
+    loopback(OuterEnum::First(InnerEnum::Gamma));
+
+    loopback(OuterEnum::Second {
+        inner: InnerEnum::Alpha(0xFF),
+        data: 0xDEADBEEF,
+    });
+
+    loopback(OuterEnum::Third(
+        InnerEnum::Beta { x: 1, y: 2 },
+        InnerEnum::Alpha(99),
+    ));
+}
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+struct StructWithEnum {
+    status: InnerEnum,
+    count: u64,
+    nested_outer: OuterEnum,
+}
+
+#[test]
+fn structs_with_nested_enums() {
+    let data = StructWithEnum {
+        status: InnerEnum::Beta { x: 10, y: 20 },
+        count: 1000,
+        nested_outer: OuterEnum::Second {
+            inner: InnerEnum::Gamma,
+            data: 0x12345678,
+        },
+    };
+
+    loopback(data);
+
+    // Test with different enum variants
+    let data2 = StructWithEnum {
+        status: InnerEnum::Alpha(127),
+        count: u64::MAX,
+        nested_outer: OuterEnum::Third(InnerEnum::Alpha(1), InnerEnum::Beta { x: u16::MAX, y: 0 }),
+    };
+
+    loopback(data2);
+}
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+enum EnumWithStruct {
+    Simple(u8),
+    WithStruct(InnerStruct),
+    WithOuter { outer: OuterStruct, flag: bool },
+    Complex(InnerStruct, OuterStruct, u32),
+}
+
+#[test]
+fn enums_with_nested_structs() {
+    loopback(EnumWithStruct::Simple(42));
+
+    loopback(EnumWithStruct::WithStruct(InnerStruct {
+        id: 123,
+        name: "test".to_string(),
+    }));
+
+    loopback(EnumWithStruct::WithOuter {
+        outer: OuterStruct {
+            inner: InnerStruct {
+                id: 456,
+                name: "nested".to_string(),
+            },
+            metadata: vec![0x01, 0x02, 0x03],
+        },
+        flag: true,
+    });
+
+    loopback(EnumWithStruct::Complex(
+        InnerStruct {
+            id: 789,
+            name: "complex1".to_string(),
+        },
+        OuterStruct {
+            inner: InnerStruct {
+                id: 101112,
+                name: "complex2".to_string(),
+            },
+            metadata: vec![0xDE, 0xAD, 0xBE, 0xEF],
+        },
+        0xCAFEBABE,
+    ));
+}
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+struct VeryComplexNested {
+    enum_field: EnumWithStruct,
+    struct_field: StructWithEnum,
+    optional: Option<OuterEnum>,
+    list: Vec<InnerEnum>,
+}
+
+#[test]
+fn complex_nested_combinations() {
+    let complex = VeryComplexNested {
+        enum_field: EnumWithStruct::WithOuter {
+            outer: OuterStruct {
+                inner: InnerStruct {
+                    id: 1,
+                    name: "first".to_string(),
+                },
+                metadata: vec![1, 2, 3],
+            },
+            flag: false,
+        },
+        struct_field: StructWithEnum {
+            status: InnerEnum::Alpha(255),
+            count: 9999,
+            nested_outer: OuterEnum::First(InnerEnum::Gamma),
+        },
+        optional: Some(OuterEnum::Third(
+            InnerEnum::Beta { x: 50, y: 100 },
+            InnerEnum::Alpha(200),
+        )),
+        list: vec![
+            InnerEnum::Gamma,
+            InnerEnum::Alpha(1),
+            InnerEnum::Beta { x: 2, y: 3 },
+        ],
+    };
+
+    loopback(complex);
+
+    // Test with None optional
+    let complex_none = VeryComplexNested {
+        enum_field: EnumWithStruct::Simple(0),
+        struct_field: StructWithEnum {
+            status: InnerEnum::Gamma,
+            count: 0,
+            nested_outer: OuterEnum::First(InnerEnum::Alpha(1)),
+        },
+        optional: None,
+        list: vec![],
+    };
+
+    loopback(complex_none);
+}
+
+// =============================================================================
 // Collection Tests
 // =============================================================================
 
