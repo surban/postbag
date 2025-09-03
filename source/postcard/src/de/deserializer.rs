@@ -140,6 +140,31 @@ impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::SeqAccess<'b> for SeqAccess<'a, '
     }
 }
 
+struct StructSeqAccess<'a, 'b, R, CFG> {
+    deserializer: &'a mut Deserializer<'b, R, CFG>,
+    len: usize,
+}
+
+impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::SeqAccess<'b> for StructSeqAccess<'a, 'b, R, CFG> {
+    type Error = Error;
+
+    fn next_element_seed<V: DeserializeSeed<'b>>(&mut self, seed: V) -> Result<Option<V::Value>> {
+        if self.len > 0 {
+            self.len -= 1;
+            self.deserializer.input.start_skippable();
+            let data = DeserializeSeed::deserialize(seed, &mut *self.deserializer)?;
+            self.deserializer.input.end_skippable()?;
+            Ok(Some(data))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.len)
+    }
+}
+
 struct StructFieldAccess<'a, 'b, R, CFG> {
     deserializer: &'a mut Deserializer<'b, R, CFG>,
     len: usize,
@@ -480,7 +505,10 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
                 len,
             })
         } else {
-            self.deserialize_tuple(len, visitor)
+            visitor.visit_seq(StructSeqAccess {
+                deserializer: self,
+                len,
+            })
         }
     }
 
