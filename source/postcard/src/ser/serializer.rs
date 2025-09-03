@@ -267,9 +267,10 @@ where
         _name: &'static str,
         variant_index: u32,
         _variant: &'static str,
-        _len: usize,
+        len: usize,
     ) -> Result<Self::SerializeStructVariant> {
         self.write_u32(variant_index)?;
+        self.write_usize(len)?;
         Ok(self)
     }
 
@@ -489,11 +490,19 @@ where
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T>(&mut self, _key: &'static str, value: &T) -> Result<()>
+    fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<()>
     where
         T: ?Sized + Serialize,
     {
-        value.serialize(&mut **self)
+        if CFG::with_identifiers() {
+            key.serialize(&mut **self)?;
+        }
+
+        self.output.start_skippable();
+        value.serialize(&mut **self)?;
+        self.output.end_skippable()?;
+
+        Ok(())
     }
 
     fn end(self) -> Result<()> {

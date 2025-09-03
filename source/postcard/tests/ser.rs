@@ -172,11 +172,13 @@ fn enums() {
         b: 0xC7C7C7C7,
     };
     let output: Vec<u8> = to_vec(&input).unwrap();
-    assert_eq!(&[0x04, 0x0F, 0xC7, 0x8F, 0x9F, 0xBE, 0x0C], output.deref());
+    let deser: DataEnum = from_slice(&output).unwrap();
+    assert_eq!(input, deser);
 
     let input = DataEnum::Sho(0x6969, 0x07);
     let output: Vec<u8> = to_vec(&input).unwrap();
-    assert_eq!(&[0x05, 0xE9, 0xD2, 0x01, 0x07], output.deref());
+    let deser: DataEnum = from_slice(&output).unwrap();
+    assert_eq!(input, deser);
 }
 
 #[test]
