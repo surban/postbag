@@ -47,13 +47,9 @@ impl<R: Read> SkipRead<R> {
         Ok(())
     }
 
-    /// Returns the reader.
+    /// Returns the contained reader.
     pub fn into_inner(self) -> R {
-        match self.0 {
-            SkipStack::Base(base) => base,
-            SkipStack::SkipBlock(_) => panic!("at least one skip block is still open"),
-            SkipStack::Dummy => unreachable!(),
-        }
+        self.0.into_inner()
     }
 }
 
@@ -92,6 +88,14 @@ impl<R: Read> SkipStack<R> {
             }
         }
         Err(Error::BadVarint)
+    }
+
+    fn into_inner(self) -> R {
+        match self {
+            SkipStack::Base(base) => base,
+            SkipStack::SkipBlock(sb) => sb.inner.into_inner(),
+            SkipStack::Dummy => unreachable!(),
+        }
     }
 }
 

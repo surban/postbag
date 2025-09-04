@@ -396,6 +396,18 @@ fn complex_nested_combinations() {
     loopback(complex_none);
 }
 
+#[test]
+fn long_struct_fields() {
+    #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+    struct LongFields {
+        n123456789n123456789n123456789n123456789n123456789n123456789n123456789: String,
+    }
+
+    loopback(LongFields {
+        n123456789n123456789n123456789n123456789n123456789n123456789n123456789: "abc".to_string(),
+    });
+}
+
 // =============================================================================
 // Collection Tests
 // =============================================================================

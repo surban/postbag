@@ -38,16 +38,9 @@ impl<W: Write> SkipWrite<W> {
         Ok(())
     }
 
-    /// Returns the contained writer after flushing it.
-    pub fn into_inner(self) -> Result<W> {
-        match self.0 {
-            SkipStack::Base(mut inner) => {
-                inner.flush()?;
-                Ok(inner)
-            }
-            SkipStack::SkipBlock(_) => panic!("at least one skip block is still open"),
-            SkipStack::Dummy => unreachable!(),
-        }
+    /// Returns the contained writer.
+    pub fn into_inner(self) -> W {
+        self.0.into_inner()
     }
 }
 
@@ -63,6 +56,14 @@ impl<W: Write> SkipStack<W> {
             Self::Base(inner) => inner.write_all(data),
             Self::SkipBlock(sb) => sb.write(data),
             Self::Dummy => unreachable!(),
+        }
+    }
+
+    fn into_inner(self) -> W {
+        match self {
+            SkipStack::Base(inner) => inner,
+            SkipStack::SkipBlock(sb) => sb.inner.into_inner(),
+            SkipStack::Dummy => unreachable!(),
         }
     }
 }

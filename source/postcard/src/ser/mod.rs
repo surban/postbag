@@ -32,7 +32,7 @@ where
 {
     let mut serializer = Serializer::<W, CFG>::new(writer);
     value.serialize(&mut serializer)?;
-    serializer.finalize()
+    Ok(serializer.finalize())
 }
 
 /// Serialize a `T` to a [`std::io::Write`],

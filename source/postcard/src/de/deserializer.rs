@@ -6,7 +6,7 @@ use serde::de::{
     value::{StringDeserializer, U32Deserializer},
 };
 
-use crate::{Cfg, cfg::DefaultCfg, de::skippable::SkipRead};
+use crate::{Cfg, ID_COUNT, ID_LEN, ID_LEN_NAME, cfg::DefaultCfg, de::skippable::SkipRead};
 use crate::{
     FALSE, NONE, SOME, TRUE,
     varint::{max_of_last_byte, varint_max},
@@ -570,9 +570,25 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        let sz = self.try_take_varint_usize()?;
-        let bytes = self.input.read(sz)?;
-        let str_sl = String::from_utf8(bytes).map_err(|_| Error::BadString)?;
+        let v = self.try_take_varint_usize()?;
+
+        if v >= ID_LEN_NAME + ID_COUNT {
+            return Err(Error::BadIdentifier);
+        }
+
+        if v >= ID_LEN_NAME {
+            let id = v - ID_LEN_NAME;
+            return visitor.visit_string(format!("_{id}"));
+        }
+
+        let len = if v == ID_LEN {
+            self.try_take_varint_usize()?
+        } else {
+            v
+        };
+
+        let bytes = self.input.read(len)?;
+        let str_sl = String::from_utf8(bytes).map_err(|_| Error::BadIdentifier)?;
 
         visitor.visit_string(str_sl)
     }

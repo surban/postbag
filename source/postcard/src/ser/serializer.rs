@@ -2,7 +2,7 @@ use std::{io::Write, marker::PhantomData};
 
 use serde::{Serialize, ser};
 
-use crate::{Cfg, FALSE, NONE, SOME, TRUE, UNKNOWN_LEN, varint::*};
+use crate::{Cfg, FALSE, ID_COUNT, ID_LEN, ID_LEN_NAME, NONE, SOME, TRUE, UNKNOWN_LEN, varint::*};
 use crate::{SPECIAL_LEN, cfg::DefaultCfg};
 use crate::{
     error::{Error, Result},
@@ -24,9 +24,9 @@ impl<W: Write, CFG: Cfg> Serializer<W, CFG> {
         }
     }
 
-    /// Get the writer after flushing it.
-    pub fn finalize(self) -> Result<W> {
-        Ok(self.output.into_inner()?)
+    /// Get the writer.
+    pub fn finalize(self) -> W {
+        self.output.into_inner()
     }
 
     fn write_usize(&mut self, data: usize) -> Result<()> {
@@ -59,6 +59,30 @@ impl<W: Write, CFG: Cfg> Serializer<W, CFG> {
         let mut buf = [0u8; varint_max::<u16>()];
         let used_buf = varint_u16(data, &mut buf);
         self.output.write(used_buf)?;
+        Ok(())
+    }
+
+    fn write_identifier(&mut self, ident: &str) -> Result<()> {
+        match ident
+            .strip_prefix("_")
+            .and_then(|s| s.parse::<usize>().ok())
+        {
+            Some(id) if id < ID_COUNT => {
+                self.write_usize(ID_LEN_NAME + id)?;
+            }
+            _ => {
+                let len = ident.len();
+                if len < ID_LEN {
+                    self.write_usize(len)?;
+                } else {
+                    self.write_usize(ID_LEN)?;
+                    self.write_usize(len)?;
+                }
+
+                self.output.write(ident.as_bytes())?;
+            }
+        }
+
         Ok(())
     }
 }
@@ -185,7 +209,7 @@ where
         variant: &'static str,
     ) -> Result<()> {
         if CFG::with_identifiers() {
-            variant.serialize(&mut *self)?;
+            self.write_identifier(variant)?;
         } else {
             self.write_u32(variant_index)?;
         }
@@ -210,7 +234,7 @@ where
         T: ?Sized + Serialize,
     {
         if CFG::with_identifiers() {
-            variant.serialize(&mut *self)?;
+            self.write_identifier(variant)?;
         } else {
             self.write_u32(variant_index)?;
         }
@@ -259,7 +283,7 @@ where
         _len: usize,
     ) -> Result<Self::SerializeTupleVariant> {
         if CFG::with_identifiers() {
-            variant.serialize(&mut *self)?;
+            self.write_identifier(variant)?;
         } else {
             self.write_u32(variant_index)?;
         }
@@ -305,7 +329,7 @@ where
         len: usize,
     ) -> Result<Self::SerializeStructVariant> {
         if CFG::with_identifiers() {
-            variant.serialize(&mut *self)?;
+            self.write_identifier(variant)?;
         } else {
             self.write_u32(variant_index)?;
         }
@@ -458,7 +482,7 @@ where
         T: ?Sized + Serialize,
     {
         if CFG::with_identifiers() {
-            key.serialize(&mut **self)?;
+            self.write_identifier(key)?;
             self.output.start_skippable();
         }
 
@@ -493,7 +517,7 @@ where
         T: ?Sized + Serialize,
     {
         if CFG::with_identifiers() {
-            key.serialize(&mut **self)?;
+            self.write_identifier(key)?;
             self.output.start_skippable();
         }
 
