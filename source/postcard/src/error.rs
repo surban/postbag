@@ -4,25 +4,23 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum Error {
-    /// This is a feature that postcard will never implement
+    /// deserialize_any is unsupported.
     DeserializeAnyUnsupported,
-    /// The length of a sequence must be known
-    SerializeSeqLengthUnknown,
-    /// Hit the end of a skip block, expected more data
-    DeserializeUnexpectedEnd,
+    /// End of block.
+    EndOfBlock,
     /// Found a varint that didn't terminate. Is the usize too big for this platform?
-    DeserializeBadVarint,
+    BadVarint,
     /// Found a bool that wasn't 0 or 1
-    DeserializeBadBool,
+    BadBool,
     /// Found an invalid unicode char
-    DeserializeBadChar,
+    BadChar,
     /// Tried to parse invalid utf-8
-    DeserializeBadUtf8,
+    BadString,
     /// Found an Option discriminant that wasn't 0 or 1
-    DeserializeBadOption,
+    BadOption,
     /// Found an enum discriminant that was > `u32::MAX`
-    DeserializeBadEnum,
-    /// Bad sequence length.
+    BadEnum,
+    /// Bad length of a sequence or map.
     BadLen,
     /// Overflow of target usize.
     UsizeOverflow,
@@ -45,22 +43,14 @@ impl Display for Error {
         use Error::*;
         match self {
             DeserializeAnyUnsupported => write!(f, "deserialize_any is unsupproted"),
-            SerializeSeqLengthUnknown => write!(f, "The length of a sequence must be known"),
-            DeserializeUnexpectedEnd => write!(f, "unexpected end of skip block"),
-            DeserializeBadVarint => {
-                write!(
-                    f,
-                    "Found a varint that didn't terminate. Is the usize too big for this platform?"
-                )
-            }
-            DeserializeBadBool => write!(f, "Found a bool that wasn't 0 or 1"),
-            DeserializeBadChar => write!(f, "Found an invalid unicode char"),
-            DeserializeBadUtf8 => write!(f, "Tried to parse invalid utf-8"),
-            DeserializeBadOption => write!(f, "Found an Option discriminant that wasn't 0 or 1"),
-            DeserializeBadEnum => {
-                write!(f, "Found an enum discriminant that was > u32::max_value()")
-            }
-            BadLen => write!(f, "bad sequence length"),
+            EndOfBlock => write!(f, "end of block"),
+            BadVarint => write!(f, "invalid integer"),
+            BadBool => write!(f, "invalid bool"),
+            BadChar => write!(f, "invalid char"),
+            BadString => write!(f, "invalid string"),
+            BadOption => write!(f, "invalid option"),
+            BadEnum => write!(f, "invalid enum discriminant"),
+            BadLen => write!(f, "invalid length"),
             UsizeOverflow => write!(f, "usize overflow"),
             Custom(msg) => write!(f, "serde error: {msg}"),
             CollectStrError => write!(

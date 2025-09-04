@@ -18,7 +18,7 @@ impl<R: Read> SkipRead<R> {
     }
 
     /// Read one byte.
-    pub fn pop(&mut self) -> Result<u8> {
+    pub fn read_u8(&mut self) -> Result<u8> {
         Ok(self.read(1)?[0])
     }
 
@@ -85,13 +85,13 @@ impl<R: Read> SkipStack<R> {
 
             if (val & 0x80) == 0 {
                 if i == varint_max::<u16>() - 1 && val > max_of_last_byte::<u16>() {
-                    return Err(Error::DeserializeBadVarint);
+                    return Err(Error::BadVarint);
                 } else {
                     return Ok(out);
                 }
             }
         }
-        Err(Error::DeserializeBadVarint)
+        Err(Error::BadVarint)
     }
 }
 
@@ -137,7 +137,7 @@ impl<R: Read> SkipBlock<R> {
             self.update_remaining()?;
 
             if self.remaining == 0 {
-                return Err(Error::DeserializeUnexpectedEnd);
+                return Err(Error::EndOfBlock);
             }
 
             let n = ct.min(self.remaining);

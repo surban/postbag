@@ -1,21 +1,22 @@
+use std::io::Read;
+use std::marker::PhantomData;
+
 use serde::de::{
     self, DeserializeSeed, IntoDeserializer, Visitor,
     value::{StringDeserializer, U32Deserializer},
 };
 
-use crate::varint::{max_of_last_byte, varint_max};
 use crate::{Cfg, cfg::DefaultCfg, de::skippable::SkipRead};
+use crate::{
+    FALSE, NONE, SOME, TRUE,
+    varint::{max_of_last_byte, varint_max},
+};
 use crate::{
     SPECIAL_LEN, UNKNOWN_LEN,
     error::{Error, Result},
 };
-use core::marker::PhantomData;
-use std::io::Read;
 
-/// A `serde` compatible deserializer, generic over “Flavors” of deserializing plugins.
-///
-/// Please note that postcard messages are not self-describing and therefore incompatible with
-/// [internally tagged enums](https://serde.rs/enum-representations.html#internally-tagged).
+/// Deserializer.
 pub struct Deserializer<'de, R, CFG = DefaultCfg> {
     input: SkipRead<R>,
     _de: PhantomData<&'de ()>,
@@ -43,80 +44,80 @@ where
 
 impl<'de, R: Read, CFG: Cfg> Deserializer<'de, R, CFG> {
     fn try_take_varint_usize(&mut self) -> Result<usize> {
-        let value = self.try_take_varint_u64()?;
+        let value = self.read_varint_u64()?;
         usize::try_from(value).map_err(|_| Error::UsizeOverflow)
     }
 
-    fn try_take_varint_u16(&mut self) -> Result<u16> {
+    fn read_varint_u16(&mut self) -> Result<u16> {
         let mut out = 0;
         for i in 0..varint_max::<u16>() {
-            let val = self.input.pop()?;
+            let val = self.input.read_u8()?;
             let carry = (val & 0x7F) as u16;
             out |= carry << (7 * i);
 
             if (val & 0x80) == 0 {
                 if i == varint_max::<u16>() - 1 && val > max_of_last_byte::<u16>() {
-                    return Err(Error::DeserializeBadVarint);
+                    return Err(Error::BadVarint);
                 } else {
                     return Ok(out);
                 }
             }
         }
-        Err(Error::DeserializeBadVarint)
+        Err(Error::BadVarint)
     }
 
-    fn try_take_varint_u32(&mut self) -> Result<u32> {
+    fn read_varint_u32(&mut self) -> Result<u32> {
         let mut out = 0;
         for i in 0..varint_max::<u32>() {
-            let val = self.input.pop()?;
+            let val = self.input.read_u8()?;
             let carry = (val & 0x7F) as u32;
             out |= carry << (7 * i);
 
             if (val & 0x80) == 0 {
                 if i == varint_max::<u32>() - 1 && val > max_of_last_byte::<u32>() {
-                    return Err(Error::DeserializeBadVarint);
+                    return Err(Error::BadVarint);
                 } else {
                     return Ok(out);
                 }
             }
         }
-        Err(Error::DeserializeBadVarint)
+        Err(Error::BadVarint)
     }
 
-    fn try_take_varint_u64(&mut self) -> Result<u64> {
+    fn read_varint_u64(&mut self) -> Result<u64> {
         let mut out = 0;
         for i in 0..varint_max::<u64>() {
-            let val = self.input.pop()?;
+            let val = self.input.read_u8()?;
             let carry = (val & 0x7F) as u64;
             out |= carry << (7 * i);
 
             if (val & 0x80) == 0 {
                 if i == varint_max::<u64>() - 1 && val > max_of_last_byte::<u64>() {
-                    return Err(Error::DeserializeBadVarint);
+                    return Err(Error::BadVarint);
                 } else {
                     return Ok(out);
                 }
             }
         }
-        Err(Error::DeserializeBadVarint)
+        Err(Error::BadVarint)
     }
 
-    fn try_take_varint_u128(&mut self) -> Result<u128> {
+    fn read_varint_u128(&mut self) -> Result<u128> {
         let mut out = 0;
         for i in 0..varint_max::<u128>() {
-            let val = self.input.pop()?;
+            let val = self.input.read_u8()?;
             let carry = (val & 0x7F) as u128;
             out |= carry << (7 * i);
 
             if (val & 0x80) == 0 {
                 if i == varint_max::<u128>() - 1 && val > max_of_last_byte::<u128>() {
-                    return Err(Error::DeserializeBadVarint);
+                    return Err(Error::BadVarint);
                 } else {
                     return Ok(out);
                 }
             }
         }
-        Err(Error::DeserializeBadVarint)
+        Err(Error::BadVarint)
     }
 }
 
@@ -138,7 +139,7 @@ impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::SeqAccess<'b> for SeqAccess<'a, '
             }
             None => match DeserializeSeed::deserialize(seed, &mut *self.deserializer) {
                 Ok(data) => Ok(Some(data)),
-                Err(Error::DeserializeUnexpectedEnd) => Ok(None),
+                Err(Error::EndOfBlock) => Ok(None),
                 Err(err) => Err(err),
             },
         }
@@ -209,21 +210,25 @@ impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::MapAccess<'b> for StructFieldAcce
 
 struct MapAccess<'a, 'b, R, CFG> {
     deserializer: &'a mut Deserializer<'b, R, CFG>,
-    len: usize,
+    len: Option<usize>,
 }
 
 impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::MapAccess<'b> for MapAccess<'a, 'b, R, CFG> {
     type Error = Error;
 
     fn next_key_seed<K: DeserializeSeed<'b>>(&mut self, seed: K) -> Result<Option<K::Value>> {
-        if self.len > 0 {
-            self.len -= 1;
-            Ok(Some(DeserializeSeed::deserialize(
-                seed,
-                &mut *self.deserializer,
-            )?))
-        } else {
-            Ok(None)
+        match &mut self.len {
+            Some(0) => Ok(None),
+            Some(len) => {
+                *len -= 1;
+                let data = DeserializeSeed::deserialize(seed, &mut *self.deserializer)?;
+                Ok(Some(data))
+            }
+            None => match DeserializeSeed::deserialize(seed, &mut *self.deserializer) {
+                Ok(data) => Ok(Some(data)),
+                Err(Error::EndOfBlock) => Ok(None),
+                Err(err) => Err(err),
+            },
         }
     }
 
@@ -232,7 +237,7 @@ impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::MapAccess<'b> for MapAccess<'a, '
     }
 
     fn size_hint(&self) -> Option<usize> {
-        Some(self.len)
+        self.len
     }
 }
 
@@ -247,20 +252,17 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        // Postcard does not support structures not known at compile time
-        panic!("deserialize_any");
-        //Err(Error::WontImplement)
+        Err(Error::DeserializeAnyUnsupported)
     }
 
-    // Take a boolean encoded as a u8
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        let val = match self.input.pop()? {
-            0 => false,
-            1 => true,
-            _ => return Err(Error::DeserializeBadBool),
+        let val = match self.input.read_u8()? {
+            FALSE => false,
+            TRUE => true,
+            _ => return Err(Error::BadBool),
         };
         visitor.visit_bool(val)
     }
@@ -269,14 +271,14 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        visitor.visit_i8(self.input.pop()? as i8)
+        visitor.visit_i8(self.input.read_u8()? as i8)
     }
 
     fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        let v = self.try_take_varint_u16()?;
+        let v = self.read_varint_u16()?;
         visitor.visit_i16(de_zig_zag_i16(v))
     }
 
@@ -284,7 +286,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        let v = self.try_take_varint_u32()?;
+        let v = self.read_varint_u32()?;
         visitor.visit_i32(de_zig_zag_i32(v))
     }
 
@@ -292,7 +294,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        let v = self.try_take_varint_u64()?;
+        let v = self.read_varint_u64()?;
         visitor.visit_i64(de_zig_zag_i64(v))
     }
 
@@ -300,7 +302,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        let v = self.try_take_varint_u128()?;
+        let v = self.read_varint_u128()?;
         visitor.visit_i128(de_zig_zag_i128(v))
     }
 
@@ -308,14 +310,14 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        visitor.visit_u8(self.input.pop()?)
+        visitor.visit_u8(self.input.read_u8()?)
     }
 
     fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        let v = self.try_take_varint_u16()?;
+        let v = self.read_varint_u16()?;
         visitor.visit_u16(v)
     }
 
@@ -323,7 +325,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        let v = self.try_take_varint_u32()?;
+        let v = self.read_varint_u32()?;
         visitor.visit_u32(v)
     }
 
@@ -331,7 +333,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        let v = self.try_take_varint_u64()?;
+        let v = self.read_varint_u64()?;
         visitor.visit_u64(v)
     }
 
@@ -339,7 +341,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        let v = self.try_take_varint_u128()?;
+        let v = self.read_varint_u128()?;
         visitor.visit_u128(v)
     }
 
@@ -369,18 +371,15 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     {
         let sz = self.try_take_varint_usize()?;
         if sz > 4 {
-            return Err(Error::DeserializeBadChar);
+            return Err(Error::BadChar);
         }
         let bytes = self.input.read(sz)?;
-        // we pass the character through string conversion because
-        // this handles transforming the array of code units to a
-        // codepoint. we can't use char::from_u32() because it expects
-        // an already-processed codepoint.
+
         let character = core::str::from_utf8(&bytes)
-            .map_err(|_| Error::DeserializeBadChar)?
+            .map_err(|_| Error::BadChar)?
             .chars()
             .next()
-            .ok_or(Error::DeserializeBadChar)?;
+            .ok_or(Error::BadChar)?;
         visitor.visit_char(character)
     }
 
@@ -397,7 +396,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     {
         let sz = self.try_take_varint_usize()?;
         let bytes = self.input.read(sz)?;
-        let str_sl = String::from_utf8(bytes).map_err(|_| Error::DeserializeBadUtf8)?;
+        let str_sl = String::from_utf8(bytes).map_err(|_| Error::BadString)?;
 
         visitor.visit_string(str_sl)
     }
@@ -422,15 +421,13 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        match self.input.pop()? {
-            0 => visitor.visit_none(),
-            1 => visitor.visit_some(self),
-            _ => Err(Error::DeserializeBadOption),
+        match self.input.read_u8()? {
+            NONE => visitor.visit_none(),
+            SOME => visitor.visit_some(self),
+            _ => Err(Error::BadOption),
         }
     }
 
-    // In Serde, unit means an anonymous value containing no data.
-    // Unit is not actually encoded in Postcard.
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -438,8 +435,6 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
         visitor.visit_unit()
     }
 
-    // Unit struct means a named value containing no data.
-    // Unit structs are not actually encoded in Postcard.
     fn deserialize_unit_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -470,10 +465,16 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
             len => Some(len),
         };
 
-        visitor.visit_seq(SeqAccess {
+        let value = visitor.visit_seq(SeqAccess {
             deserializer: self,
             len,
-        })
+        })?;
+
+        if len.is_none() {
+            self.input.end_skippable()?;
+        }
+
+        Ok(value)
     }
 
     fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value>
@@ -502,12 +503,28 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        let len = self.try_take_varint_usize()?;
+        let len = match self.try_take_varint_usize()? {
+            SPECIAL_LEN => match self.try_take_varint_usize()? {
+                SPECIAL_LEN => Some(SPECIAL_LEN),
+                UNKNOWN_LEN => {
+                    self.input.start_skippable();
+                    None
+                }
+                _ => return Err(Error::BadLen),
+            },
+            len => Some(len),
+        };
 
-        visitor.visit_map(MapAccess {
+        let value = visitor.visit_map(MapAccess {
             deserializer: self,
             len,
-        })
+        })?;
+
+        if len.is_none() {
+            self.input.end_skippable()?;
+        }
+
+        Ok(value)
     }
 
     fn deserialize_struct<V>(
@@ -555,7 +572,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     {
         let sz = self.try_take_varint_usize()?;
         let bytes = self.input.read(sz)?;
-        let str_sl = String::from_utf8(bytes).map_err(|_| Error::DeserializeBadUtf8)?;
+        let str_sl = String::from_utf8(bytes).map_err(|_| Error::BadString)?;
 
         visitor.visit_string(str_sl)
     }
@@ -564,9 +581,6 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        println!("deserialize_ignored_any");
-
-        // end_skippable() will discard the data.
         visitor.visit_unit()
     }
 }
@@ -603,11 +617,11 @@ impl<'de, R: Read, CFG: Cfg> serde::de::EnumAccess<'de> for &mut Deserializer<'d
         let v = if CFG::with_identifiers() {
             let sz = self.try_take_varint_usize()?;
             let bytes = self.input.read(sz)?;
-            let str_sl = String::from_utf8(bytes).map_err(|_| Error::DeserializeBadUtf8)?;
+            let str_sl = String::from_utf8(bytes).map_err(|_| Error::BadString)?;
             let deserializer: StringDeserializer<Error> = str_sl.into_deserializer();
             DeserializeSeed::deserialize(seed, deserializer)?
         } else {
-            let varint = self.try_take_varint_u32()?;
+            let varint = self.read_varint_u32()?;
             let deserializer: U32Deserializer<Error> = varint.into_deserializer();
             DeserializeSeed::deserialize(seed, deserializer)?
         };

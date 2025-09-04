@@ -2,6 +2,7 @@ use postcard::{Cfg, Config, Error, from_slice, from_slice_with_cfg, to_vec_with_
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
 use std::fmt::Debug;
 use std::fmt::Write;
+use std::marker::PhantomData;
 use std::{collections::BTreeMap, io::ErrorKind};
 
 /// Performs serialization followed by deserialization and checks that the
@@ -540,6 +541,287 @@ fn zero_sized_types() {
 }
 
 // =============================================================================
+// Unknown Length Sequence Tests
+// =============================================================================
+
+/// A custom sequence type that serializes with unknown length (None)
+#[derive(Debug, Eq, PartialEq)]
+pub struct UnknownLengthSeq<T> {
+    items: Vec<T>,
+}
+
+impl<T> UnknownLengthSeq<T> {
+    pub fn new(items: Vec<T>) -> Self {
+        Self { items }
+    }
+}
+
+impl<T> Serialize for UnknownLengthSeq<T>
+where
+    T: Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeSeq;
+        // Serialize with unknown length (None) instead of Some(self.items.len())
+        let mut seq = serializer.serialize_seq(None)?;
+        for item in &self.items {
+            seq.serialize_element(item)?;
+        }
+        seq.end()
+    }
+}
+
+impl<'de, T> Deserialize<'de> for UnknownLengthSeq<T>
+where
+    T: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::{SeqAccess, Visitor};
+
+        struct UnknownLengthSeqVisitor<T>(PhantomData<T>);
+
+        impl<'de, T> Visitor<'de> for UnknownLengthSeqVisitor<T>
+        where
+            T: Deserialize<'de>,
+        {
+            type Value = UnknownLengthSeq<T>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a sequence of unknown length")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut items = Vec::new();
+                while let Some(item) = seq.next_element()? {
+                    items.push(item);
+                }
+                Ok(UnknownLengthSeq::new(items))
+            }
+        }
+
+        deserializer.deserialize_seq(UnknownLengthSeqVisitor(PhantomData))
+    }
+}
+
+#[test]
+fn sequences_unknown_length() {
+    // Test empty sequence
+    let empty_seq = UnknownLengthSeq::new(vec![] as Vec<u32>);
+    println!("Testing empty sequence");
+    loopback(empty_seq);
+
+    // Test sequence with single element
+    let single_seq = UnknownLengthSeq::new(vec![42u32]);
+    loopback(single_seq);
+
+    // Test sequence with multiple elements
+    let multi_seq = UnknownLengthSeq::new(vec![1u32, 2, 3, 4, 5]);
+    loopback(multi_seq);
+
+    // Test sequence with different data types
+    let string_seq = UnknownLengthSeq::new(vec![
+        "hello".to_string(),
+        "world".to_string(),
+        "postcard".to_string(),
+    ]);
+    loopback(string_seq);
+
+    // Test sequence with complex nested structures
+    let complex_seq = UnknownLengthSeq::new(vec![
+        BasicU8S {
+            st: 0x1234,
+            ei: 0xAB,
+            ote: 0x5678_9ABC_DEF0_1234_5678_9ABC_DEF0_1234,
+            sf: 0x9876_5432_10AB_CDEF,
+            tt: 0xDEAD_BEEF,
+        },
+        BasicU8S {
+            st: 0x5678,
+            ei: 0xCD,
+            ote: 0x1111_2222_3333_4444_5555_6666_7777_8888,
+            sf: 0xFFFF_FFFF_FFFF_FFFF,
+            tt: 0xCAFE_BABE,
+        },
+    ]);
+    loopback(complex_seq);
+
+    // Test sequence with large number of elements to test boundary conditions
+    let large_seq = UnknownLengthSeq::new((0..1000u16).collect());
+    loopback(large_seq);
+
+    // Test sequence with boundary length values (around SPECIAL_LEN = 125)
+    for len in [123, 124, 125, 126, 127] {
+        let boundary_seq = UnknownLengthSeq::new((0..len as u8).collect());
+        loopback(boundary_seq);
+    }
+}
+
+// =============================================================================
+// Unknown Length Map Tests
+// =============================================================================
+
+/// A custom map type that serializes with unknown length (None)
+#[derive(Debug, Eq, PartialEq)]
+pub struct UnknownLengthMap<K, V> {
+    items: BTreeMap<K, V>,
+}
+
+impl<K, V> UnknownLengthMap<K, V> {
+    pub fn new(items: BTreeMap<K, V>) -> Self {
+        Self { items }
+    }
+}
+
+impl<K, V> Serialize for UnknownLengthMap<K, V>
+where
+    K: Serialize,
+    V: Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeMap;
+        // Serialize with unknown length (None) instead of Some(self.items.len())
+        let mut map = serializer.serialize_map(None)?;
+        for (key, value) in &self.items {
+            map.serialize_entry(key, value)?;
+        }
+        map.end()
+    }
+}
+
+impl<'de, K, V> Deserialize<'de> for UnknownLengthMap<K, V>
+where
+    K: Deserialize<'de> + Ord,
+    V: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::{MapAccess, Visitor};
+
+        struct UnknownLengthMapVisitor<K, V>(PhantomData<(K, V)>);
+
+        impl<'de, K, V> Visitor<'de> for UnknownLengthMapVisitor<K, V>
+        where
+            K: Deserialize<'de> + Ord,
+            V: Deserialize<'de>,
+        {
+            type Value = UnknownLengthMap<K, V>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a map of unknown length")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut items = BTreeMap::new();
+                while let Some((key, value)) = map.next_entry()? {
+                    items.insert(key, value);
+                }
+                Ok(UnknownLengthMap::new(items))
+            }
+        }
+
+        deserializer.deserialize_map(UnknownLengthMapVisitor(PhantomData))
+    }
+}
+
+#[test]
+fn maps_unknown_length() {
+    // Test empty map
+    let empty_map = UnknownLengthMap::new(BTreeMap::<u32, u32>::new());
+    println!("Testing empty map");
+    loopback(empty_map);
+
+    // Test map with single entry
+    let mut single_map_data = BTreeMap::new();
+    single_map_data.insert(42u32, 84u32);
+    let single_map = UnknownLengthMap::new(single_map_data);
+    loopback(single_map);
+
+    // Test map with multiple entries
+    let mut multi_map_data = BTreeMap::new();
+    for i in 1..=5 {
+        multi_map_data.insert(i, i * 2);
+    }
+    let multi_map = UnknownLengthMap::new(multi_map_data);
+    loopback(multi_map);
+
+    // Test map with string keys and values
+    let mut string_map_data = BTreeMap::new();
+    string_map_data.insert("hello".to_string(), "world".to_string());
+    string_map_data.insert("postcard".to_string(), "serde".to_string());
+    string_map_data.insert("rust".to_string(), "language".to_string());
+    let string_map = UnknownLengthMap::new(string_map_data);
+    loopback(string_map);
+
+    // Test map with complex nested structures as values
+    let mut complex_map_data = BTreeMap::new();
+    complex_map_data.insert(
+        1u8,
+        BasicU8S {
+            st: 0x1234,
+            ei: 0xAB,
+            ote: 0x5678_9ABC_DEF0_1234_5678_9ABC_DEF0_1234,
+            sf: 0x9876_5432_10AB_CDEF,
+            tt: 0xDEAD_BEEF,
+        },
+    );
+    complex_map_data.insert(
+        2u8,
+        BasicU8S {
+            st: 0x5678,
+            ei: 0xCD,
+            ote: 0x1111_2222_3333_4444_5555_6666_7777_8888,
+            sf: 0xFFFF_FFFF_FFFF_FFFF,
+            tt: 0xCAFE_BABE,
+        },
+    );
+    let complex_map = UnknownLengthMap::new(complex_map_data);
+    loopback(complex_map);
+
+    // Test map with large number of entries to test boundary conditions
+    let mut large_map_data = BTreeMap::new();
+    for i in 0..1000u16 {
+        large_map_data.insert(i, i * 3);
+    }
+    let large_map = UnknownLengthMap::new(large_map_data);
+    loopback(large_map);
+
+    // Test map with boundary length values (around SPECIAL_LEN = 125)
+    for len in [123, 124, 125, 126, 127] {
+        let mut boundary_map_data = BTreeMap::new();
+        for i in 0..len {
+            boundary_map_data.insert(i as u8, i as u8);
+        }
+        let boundary_map = UnknownLengthMap::new(boundary_map_data);
+        loopback(boundary_map);
+    }
+
+    // Test map with mixed key-value types
+    let mut mixed_map_data = BTreeMap::new();
+    mixed_map_data.insert(10u16, "ten".to_string());
+    mixed_map_data.insert(20u16, "twenty".to_string());
+    mixed_map_data.insert(30u16, "thirty".to_string());
+    let mixed_map = UnknownLengthMap::new(mixed_map_data);
+    loopback(mixed_map);
+}
+
+// =============================================================================
 // Error Handling and Edge Case Tests
 // =============================================================================
 
@@ -558,5 +840,5 @@ fn varint_boundary_tests() {
     loopback(u32::MAX);
 
     let deser: postcard::Result<u32> = from_slice(&[0xFF, 0xFF, 0xFF, 0xFF, 0x1F]);
-    assert!(matches!(deser, Err(Error::DeserializeBadVarint)));
+    assert!(matches!(deser, Err(Error::BadVarint)));
 }

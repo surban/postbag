@@ -1,10 +1,10 @@
+use deserializer::Deserializer;
 use serde::de::DeserializeOwned;
+
+use crate::{Cfg, cfg::DefaultCfg, error::Result};
 
 pub(crate) mod deserializer;
 mod skippable;
-
-use crate::{Cfg, cfg::DefaultCfg, error::Result};
-use deserializer::Deserializer;
 
 /// Deserialize a message of type `T` from a byte slice. The unused portion (if any)
 /// of the byte slice is not returned.

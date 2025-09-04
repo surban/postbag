@@ -230,17 +230,15 @@ fn removed_struct_fields_nested_struct() {
         x: 99,
     };
 
-    let data = to_vec_with_cfg::<_, WithoutIdents>(&xa).unwrap();
-    let xb: XB = from_slice_with_cfg::<_, WithoutIdents>(&data).unwrap();
+    let xb: XB = transform::<_, _, WithIdents>(&xa);
     assert_eq!(xb.a.f1, xa.a.f1);
     assert_eq!(xb.a.f2, xa.a.f2);
     assert_eq!(xb.x, xa.x);
 
-    dbg!(xb);
-    //
-    //     let b: B = transform::<_, _, WithoutIdents>(&a);
-    //     assert_eq!(b.f1, a.f1);
-    //     assert_eq!(b.f2, a.f2);
+    let xb: XB = transform::<_, _, WithoutIdents>(&xa);
+    assert_eq!(xb.a.f1, xa.a.f1);
+    assert_eq!(xb.a.f2, xa.a.f2);
+    assert_eq!(xb.x, xa.x);
 }
 
 #[test]
@@ -267,14 +265,13 @@ fn removed_struct_fields_nested_tuple() {
         99,
     );
 
-    let data = to_vec_with_cfg::<_, WithIdents>(&xa).unwrap();
-    let xb: (B, u32) = from_slice_with_cfg::<_, WithIdents>(&data).unwrap();
+    let xb: (B, u32) = transform::<_, _, WithIdents>(&xa);
     assert_eq!(xb.0.f1, xa.0.f1);
     assert_eq!(xb.0.f2, xa.0.f2);
     assert_eq!(xb.1, xa.1);
 
-    //
-    //     let b: B = transform::<_, _, WithoutIdents>(&a);
-    //     assert_eq!(b.f1, a.f1);
-    //     assert_eq!(b.f2, a.f2);
+    let xb: (B, u32) = transform::<_, _, WithoutIdents>(&xa);
+    assert_eq!(xb.0.f1, xa.0.f1);
+    assert_eq!(xb.0.f2, xa.0.f2);
+    assert_eq!(xb.1, xa.1);
 }

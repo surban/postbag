@@ -1,21 +1,15 @@
-use serde::{Serialize, ser};
 use std::{io::Write, marker::PhantomData};
 
-use crate::{Cfg, UNKNOWN_LEN, varint::*};
+use serde::{Serialize, ser};
+
+use crate::{Cfg, FALSE, NONE, SOME, TRUE, UNKNOWN_LEN, varint::*};
 use crate::{SPECIAL_LEN, cfg::DefaultCfg};
 use crate::{
     error::{Error, Result},
     ser::skippable::SkipWrite,
 };
 
-/// A `serde` compatible serializer, generic over "Flavors" of serializing plugins.
-///
-/// It should rarely be necessary to directly use this type unless you are implementing your
-/// own [`SerFlavor`].
-///
-/// See the docs for [`SerFlavor`] for more information about "flavors" of serialization
-///
-/// [`SerFlavor`]: crate::ser_flavors::Flavor
+/// Serializer
 pub struct Serializer<W, CFG = DefaultCfg> {
     output: SkipWrite<W>,
     _cfg: PhantomData<CFG>,
@@ -35,38 +29,33 @@ impl<W: Write, CFG: Cfg> Serializer<W, CFG> {
         Ok(self.output.into_inner()?)
     }
 
-    /// Attempt to push a variably encoded [usize] into the output data stream
-    pub(crate) fn write_usize(&mut self, data: usize) -> Result<()> {
+    fn write_usize(&mut self, data: usize) -> Result<()> {
         let value = u64::try_from(data).map_err(|_| Error::UsizeOverflow)?;
         self.write_u64(value)
     }
 
-    /// Attempt to push a variably encoded [u128] into the output data stream
-    pub(crate) fn write_u128(&mut self, data: u128) -> Result<()> {
+    fn write_u128(&mut self, data: u128) -> Result<()> {
         let mut buf = [0u8; varint_max::<u128>()];
         let used_buf = varint_u128(data, &mut buf);
         self.output.write(used_buf)?;
         Ok(())
     }
 
-    /// Attempt to push a variably encoded [u64] into the output data stream
-    pub(crate) fn write_u64(&mut self, data: u64) -> Result<()> {
+    fn write_u64(&mut self, data: u64) -> Result<()> {
         let mut buf = [0u8; varint_max::<u64>()];
         let used_buf = varint_u64(data, &mut buf);
         self.output.write(used_buf)?;
         Ok(())
     }
 
-    /// Attempt to push a variably encoded [u32] into the output data stream
-    pub(crate) fn write_u32(&mut self, data: u32) -> Result<()> {
+    fn write_u32(&mut self, data: u32) -> Result<()> {
         let mut buf = [0u8; varint_max::<u32>()];
         let used_buf = varint_u32(data, &mut buf);
         self.output.write(used_buf)?;
         Ok(())
     }
 
-    /// Attempt to push a variably encoded [u16] into the output data stream
-    pub(crate) fn write_u16(&mut self, data: u16) -> Result<()> {
+    fn write_u16(&mut self, data: u16) -> Result<()> {
         let mut buf = [0u8; varint_max::<u16>()];
         let used_buf = varint_u16(data, &mut buf);
         self.output.write(used_buf)?;
@@ -86,7 +75,7 @@ where
     type SerializeTuple = Self;
     type SerializeTupleStruct = Self;
     type SerializeTupleVariant = Self;
-    type SerializeMap = Self;
+    type SerializeMap = MapSerializer<'a, W, CFG>;
     type SerializeStruct = Self;
     type SerializeStructVariant = Self;
 
@@ -95,7 +84,7 @@ where
     }
 
     fn serialize_bool(self, v: bool) -> Result<()> {
-        self.serialize_u8(if v { 1 } else { 0 })
+        self.serialize_u8(if v { TRUE } else { FALSE })
     }
 
     fn serialize_i8(self, v: i8) -> Result<()> {
@@ -170,14 +159,14 @@ where
     }
 
     fn serialize_none(self) -> Result<()> {
-        self.serialize_u8(0)
+        self.serialize_u8(NONE)
     }
 
     fn serialize_some<T>(self, value: &T) -> Result<()>
     where
         T: ?Sized + Serialize,
     {
-        self.serialize_u8(1)?;
+        self.serialize_u8(SOME)?;
         value.serialize(self)
     }
 
@@ -279,8 +268,23 @@ where
     }
 
     fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap> {
-        self.write_usize(len.ok_or(Error::SerializeSeqLengthUnknown)?)?;
-        Ok(self)
+        match len {
+            Some(SPECIAL_LEN) => {
+                self.write_usize(SPECIAL_LEN)?;
+                self.write_usize(SPECIAL_LEN)?;
+            }
+            Some(len) => self.write_usize(len)?,
+            None => {
+                self.write_usize(SPECIAL_LEN)?;
+                self.write_usize(UNKNOWN_LEN)?;
+                self.output.start_skippable();
+            }
+        }
+
+        Ok(MapSerializer {
+            serializer: self,
+            len,
+        })
     }
 
     fn serialize_struct(self, _name: &'static str, len: usize) -> Result<Self::SerializeStruct> {
@@ -313,74 +317,6 @@ where
         }
 
         Ok(self)
-    }
-
-    fn collect_str<T>(self, value: &T) -> Result<Self::Ok>
-    where
-        T: core::fmt::Display + ?Sized,
-    {
-        use core::fmt::Write;
-
-        // Unfortunately, we need to know the size of the serialized data before
-        // we can place it into the output. In order to do this, we run the formatting
-        // of the output data TWICE, the first time to determine the length, the
-        // second time to actually format the data
-        //
-        // There are potentially other ways to do this, such as:
-        //
-        // * Reserving a fixed max size, such as 5 bytes, for the length field, and
-        //     leaving non-canonical trailing zeroes at the end. This would work up
-        //     to some reasonable length, but might have some portability vs max size
-        //     tradeoffs, e.g. 64KiB if we pick 3 bytes, or 4GiB if we pick 5 bytes
-        // * Expose some kind of "memmove" capability to flavors, to allow us to
-        //     format into the buffer, then "scoot over" that many times.
-        //
-        // Despite the current approaches downside in speed, it is likely flexible
-        // enough for the rare-ish case where formatting a Debug impl is necessary.
-        // This is better than the previous panicking behavior, and can be improved
-        // in the future.
-        struct CountWriter {
-            ct: usize,
-        }
-        impl Write for CountWriter {
-            fn write_str(&mut self, s: &str) -> core::result::Result<(), core::fmt::Error> {
-                self.ct += s.len();
-                Ok(())
-            }
-        }
-
-        let mut ctr = CountWriter { ct: 0 };
-
-        // This is the first pass through, where we just count the length of the
-        // data that we are given
-        write!(&mut ctr, "{value}").map_err(|_| Error::CollectStrError)?;
-        let len = ctr.ct;
-        self.write_usize(len)?;
-
-        struct FmtWriter<'a, IW>
-        where
-            IW: std::io::Write,
-        {
-            output: &'a mut SkipWrite<IW>,
-        }
-        impl<IW> Write for FmtWriter<'_, IW>
-        where
-            IW: std::io::Write,
-        {
-            fn write_str(&mut self, s: &str) -> core::result::Result<(), core::fmt::Error> {
-                self.output
-                    .write(s.as_bytes())
-                    .map_err(|_| core::fmt::Error)
-            }
-        }
-
-        // This second pass actually inserts the data.
-        let mut fw = FmtWriter {
-            output: &mut self.output,
-        };
-        write!(&mut fw, "{value}").map_err(|_| Error::CollectStrError)?;
-
-        Ok(())
     }
 }
 
@@ -473,7 +409,12 @@ where
     }
 }
 
-impl<W, CFG> ser::SerializeMap for &mut Serializer<W, CFG>
+pub struct MapSerializer<'a, W, CFG> {
+    serializer: &'a mut Serializer<W, CFG>,
+    len: Option<usize>,
+}
+
+impl<'a, W, CFG> ser::SerializeMap for MapSerializer<'a, W, CFG>
 where
     W: Write,
     CFG: Cfg,
@@ -485,17 +426,21 @@ where
     where
         T: ?Sized + Serialize,
     {
-        key.serialize(&mut **self)
+        key.serialize(&mut *self.serializer)
     }
 
     fn serialize_value<T>(&mut self, value: &T) -> Result<()>
     where
         T: ?Sized + Serialize,
     {
-        value.serialize(&mut **self)
+        value.serialize(&mut *self.serializer)
     }
 
     fn end(self) -> Result<()> {
+        if self.len.is_none() {
+            self.serializer.output.end_skippable()?;
+        }
+
         Ok(())
     }
 }
