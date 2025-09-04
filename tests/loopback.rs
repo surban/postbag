@@ -1,8 +1,10 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
-use std::fmt::Debug;
-use std::fmt::Write;
-use std::marker::PhantomData;
-use std::{collections::BTreeMap, io::ErrorKind};
+use std::{
+    collections::BTreeMap,
+    fmt::{Debug, Write},
+    io::ErrorKind,
+    marker::PhantomData,
+};
 
 use remoc_codec::{Cfg, Config, Error, from_slice, from_slice_with_cfg, to_vec_with_cfg};
 
@@ -18,13 +20,9 @@ where
     println!("{serialized:02x?}");
     dbg!(serialized.len());
 
-    let deserialized: T =
-        from_slice_with_cfg::<_, CFG>(&serialized).expect("deserialization failed");
+    let deserialized: T = from_slice_with_cfg::<_, CFG>(&serialized).expect("deserialization failed");
 
-    assert_eq!(
-        *value, deserialized,
-        "deserialized value does not match original value"
-    );
+    assert_eq!(*value, deserialized, "deserialized value does not match original value");
 }
 
 /// Performs serialization followed by deserialization and checks that the
@@ -132,10 +130,7 @@ struct RefStruct {
 fn structs_with_references() {
     let message = "hElLo";
     let bytes = [0x01, 0x10, 0x02, 0x20];
-    loopback(RefStruct {
-        bytes: bytes.to_vec(),
-        str_s: message.to_string(),
-    });
+    loopback(RefStruct { bytes: bytes.to_vec(), str_s: message.to_string() });
 }
 
 // =============================================================================
@@ -176,14 +171,8 @@ fn enums_with_data() {
     loopback(DataEnum::Bim(u64::MAX));
     loopback(DataEnum::Bib(u16::MAX));
     loopback(DataEnum::Bap(u8::MAX));
-    loopback(DataEnum::Kim(EnumStruct {
-        eight: 0xF0,
-        sixt: 0xACAC,
-    }));
-    loopback(DataEnum::Chi {
-        a: 0x0F,
-        b: 0xC7C7C7C7,
-    });
+    loopback(DataEnum::Kim(EnumStruct { eight: 0xF0, sixt: 0xACAC }));
+    loopback(DataEnum::Chi { a: 0x0F, b: 0xC7C7C7C7 });
     loopback(DataEnum::Sho(0x6969, 0x07));
 }
 
@@ -211,25 +200,16 @@ struct DeeplyNestedStruct {
 
 #[test]
 fn nested_structs() {
-    let inner = InnerStruct {
-        id: 42,
-        name: "inner".to_string(),
-    };
+    let inner = InnerStruct { id: 42, name: "inner".to_string() };
 
-    let outer = OuterStruct {
-        inner,
-        metadata: vec![1, 2, 3, 4],
-    };
+    let outer = OuterStruct { inner, metadata: vec![1, 2, 3, 4] };
 
     loopback(outer);
 
     // Test deeply nested structs
     let deeply_nested = DeeplyNestedStruct {
         level1: OuterStruct {
-            inner: InnerStruct {
-                id: 999,
-                name: "deep".to_string(),
-            },
+            inner: InnerStruct { id: 999, name: "deep".to_string() },
             metadata: vec![0xFF, 0xAA, 0x55],
         },
         extra: 0x1234,
@@ -258,15 +238,9 @@ fn nested_enums() {
     loopback(OuterEnum::First(InnerEnum::Beta { x: 100, y: 200 }));
     loopback(OuterEnum::First(InnerEnum::Gamma));
 
-    loopback(OuterEnum::Second {
-        inner: InnerEnum::Alpha(0xFF),
-        data: 0xDEADBEEF,
-    });
+    loopback(OuterEnum::Second { inner: InnerEnum::Alpha(0xFF), data: 0xDEADBEEF });
 
-    loopback(OuterEnum::Third(
-        InnerEnum::Beta { x: 1, y: 2 },
-        InnerEnum::Alpha(99),
-    ));
+    loopback(OuterEnum::Third(InnerEnum::Beta { x: 1, y: 2 }, InnerEnum::Alpha(99)));
 }
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -281,10 +255,7 @@ fn structs_with_nested_enums() {
     let data = StructWithEnum {
         status: InnerEnum::Beta { x: 10, y: 20 },
         count: 1000,
-        nested_outer: OuterEnum::Second {
-            inner: InnerEnum::Gamma,
-            data: 0x12345678,
-        },
+        nested_outer: OuterEnum::Second { inner: InnerEnum::Gamma, data: 0x12345678 },
     };
 
     loopback(data);
@@ -311,32 +282,20 @@ enum EnumWithStruct {
 fn enums_with_nested_structs() {
     loopback(EnumWithStruct::Simple(42));
 
-    loopback(EnumWithStruct::WithStruct(InnerStruct {
-        id: 123,
-        name: "test".to_string(),
-    }));
+    loopback(EnumWithStruct::WithStruct(InnerStruct { id: 123, name: "test".to_string() }));
 
     loopback(EnumWithStruct::WithOuter {
         outer: OuterStruct {
-            inner: InnerStruct {
-                id: 456,
-                name: "nested".to_string(),
-            },
+            inner: InnerStruct { id: 456, name: "nested".to_string() },
             metadata: vec![0x01, 0x02, 0x03],
         },
         flag: true,
     });
 
     loopback(EnumWithStruct::Complex(
-        InnerStruct {
-            id: 789,
-            name: "complex1".to_string(),
-        },
+        InnerStruct { id: 789, name: "complex1".to_string() },
         OuterStruct {
-            inner: InnerStruct {
-                id: 101112,
-                name: "complex2".to_string(),
-            },
+            inner: InnerStruct { id: 101112, name: "complex2".to_string() },
             metadata: vec![0xDE, 0xAD, 0xBE, 0xEF],
         },
         0xCAFEBABE,
@@ -356,10 +315,7 @@ fn complex_nested_combinations() {
     let complex = VeryComplexNested {
         enum_field: EnumWithStruct::WithOuter {
             outer: OuterStruct {
-                inner: InnerStruct {
-                    id: 1,
-                    name: "first".to_string(),
-                },
+                inner: InnerStruct { id: 1, name: "first".to_string() },
                 metadata: vec![1, 2, 3],
             },
             flag: false,
@@ -369,15 +325,8 @@ fn complex_nested_combinations() {
             count: 9999,
             nested_outer: OuterEnum::First(InnerEnum::Gamma),
         },
-        optional: Some(OuterEnum::Third(
-            InnerEnum::Beta { x: 50, y: 100 },
-            InnerEnum::Alpha(200),
-        )),
-        list: vec![
-            InnerEnum::Gamma,
-            InnerEnum::Alpha(1),
-            InnerEnum::Beta { x: 2, y: 3 },
-        ],
+        optional: Some(OuterEnum::Third(InnerEnum::Beta { x: 50, y: 100 }, InnerEnum::Alpha(200))),
+        list: vec![InnerEnum::Gamma, InnerEnum::Alpha(1), InnerEnum::Beta { x: 2, y: 3 }],
     };
 
     loopback(complex);
@@ -423,12 +372,7 @@ fn id_struct_fields() {
         my_long_field4: u8,
     }
 
-    loopback(IdFields {
-        my_long_field1: 1,
-        my_long_field2: 2,
-        my_long_field3: 3,
-        my_long_field4: 4,
-    });
+    loopback(IdFields { my_long_field1: 1, my_long_field2: 2, my_long_field3: 3, my_long_field4: 4 });
 }
 
 #[test]
@@ -456,10 +400,7 @@ fn id_enum_fields() {
     loopback(IdEnum::MyLongVariant2());
     loopback(IdEnum::MyLongVariant3(1));
     loopback(IdEnum::MyLongVariant4((2, 3)));
-    loopback(IdEnum::MyLongVariant5 {
-        long_field_name_a: 4,
-        long_field_name_b: 4,
-    });
+    loopback(IdEnum::MyLongVariant5 { long_field_name_a: 4, long_field_name_b: 4 });
 }
 
 // =============================================================================
@@ -575,9 +516,7 @@ impl<'de> Deserialize<'de> for ByteSliceStruct {
     {
         // Deserialization of byte slices is specialized for byte slices, so the default
         // deserialization will call `Deserializer::deserialize_bytes`.
-        Ok(Self {
-            bytes: Deserialize::deserialize(deserializer)?,
-        })
+        Ok(Self { bytes: Deserialize::deserialize(deserializer)? })
     }
 }
 
@@ -585,9 +524,7 @@ impl<'de> Deserialize<'de> for ByteSliceStruct {
 fn bytes_arrays_and_custom_serialization() {
     loopback([0u8; 32]);
     loopback(vec![0u8; 32]);
-    loopback(ByteSliceStruct {
-        bytes: vec![0u8; 32],
-    });
+    loopback(ByteSliceStruct { bytes: vec![0u8; 32] });
 }
 
 // =============================================================================
@@ -694,11 +631,8 @@ fn sequences_unknown_length() {
     loopback(multi_seq);
 
     // Test sequence with different data types
-    let string_seq = UnknownLengthSeq::new(vec![
-        "hello".to_string(),
-        "world".to_string(),
-        "remoc-codec".to_string(),
-    ]);
+    let string_seq =
+        UnknownLengthSeq::new(vec!["hello".to_string(), "world".to_string(), "remoc-codec".to_string()]);
     loopback(string_seq);
 
     // Test sequence with complex nested structures

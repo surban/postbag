@@ -1,8 +1,9 @@
 //! Skippable blocks writer.
 
-use std::io::Result;
-use std::io::Write;
-use std::mem;
+use std::{
+    io::{Result, Write},
+    mem,
+};
 
 use crate::varint::{varint_max, varint_u16};
 
@@ -77,10 +78,7 @@ impl<W: Write> SkipBlock<W> {
     const MAX_LEN: usize = u16::MAX as usize;
 
     fn new(inner: SkipStack<W>) -> Self {
-        Self {
-            inner: Box::new(inner),
-            buf: Vec::new(),
-        }
+        Self { inner: Box::new(inner), buf: Vec::new() }
     }
 
     fn write(&mut self, data: &[u8]) -> Result<()> {

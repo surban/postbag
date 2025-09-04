@@ -2,11 +2,12 @@ use std::{io::Write, marker::PhantomData};
 
 use serde::{Serialize, ser};
 
-use crate::{Cfg, FALSE, ID_COUNT, ID_LEN, ID_LEN_NAME, NONE, SOME, TRUE, UNKNOWN_LEN, varint::*};
-use crate::{SPECIAL_LEN, cfg::DefaultCfg};
 use crate::{
+    Cfg, FALSE, ID_COUNT, ID_LEN, ID_LEN_NAME, NONE, SOME, SPECIAL_LEN, TRUE, UNKNOWN_LEN,
+    cfg::DefaultCfg,
     error::{Error, Result},
     ser::skippable::SkipWrite,
+    varint::*,
 };
 
 /// Serializer
@@ -18,10 +19,7 @@ pub struct Serializer<W, CFG = DefaultCfg> {
 impl<W: Write, CFG: Cfg> Serializer<W, CFG> {
     /// Creates a new serializer.
     pub fn new(write: W) -> Self {
-        Self {
-            output: SkipWrite::new(write),
-            _cfg: PhantomData,
-        }
+        Self { output: SkipWrite::new(write), _cfg: PhantomData }
     }
 
     /// Get the writer.
@@ -63,10 +61,7 @@ impl<W: Write, CFG: Cfg> Serializer<W, CFG> {
     }
 
     fn write_identifier(&mut self, ident: &str) -> Result<()> {
-        match ident
-            .strip_prefix("_")
-            .and_then(|s| s.parse::<usize>().ok())
-        {
+        match ident.strip_prefix("_").and_then(|s| s.parse::<usize>().ok()) {
             Some(id) if id < ID_COUNT => {
                 self.write_usize(ID_LEN_NAME + id)?;
             }
@@ -203,10 +198,7 @@ where
     }
 
     fn serialize_unit_variant(
-        self,
-        _name: &'static str,
-        variant_index: u32,
-        variant: &'static str,
+        self, _name: &'static str, variant_index: u32, variant: &'static str,
     ) -> Result<()> {
         if CFG::with_identifiers() {
             self.write_identifier(variant)?;
@@ -224,11 +216,7 @@ where
     }
 
     fn serialize_newtype_variant<T>(
-        self,
-        _name: &'static str,
-        variant_index: u32,
-        variant: &'static str,
-        value: &T,
+        self, _name: &'static str, variant_index: u32, variant: &'static str, value: &T,
     ) -> Result<()>
     where
         T: ?Sized + Serialize,
@@ -257,30 +245,19 @@ where
             }
         }
 
-        Ok(SeqSerializer {
-            serializer: self,
-            len,
-        })
+        Ok(SeqSerializer { serializer: self, len })
     }
 
     fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple> {
         Ok(self)
     }
 
-    fn serialize_tuple_struct(
-        self,
-        _name: &'static str,
-        _len: usize,
-    ) -> Result<Self::SerializeTupleStruct> {
+    fn serialize_tuple_struct(self, _name: &'static str, _len: usize) -> Result<Self::SerializeTupleStruct> {
         Ok(self)
     }
 
     fn serialize_tuple_variant(
-        self,
-        _name: &'static str,
-        variant_index: u32,
-        variant: &'static str,
-        _len: usize,
+        self, _name: &'static str, variant_index: u32, variant: &'static str, _len: usize,
     ) -> Result<Self::SerializeTupleVariant> {
         if CFG::with_identifiers() {
             self.write_identifier(variant)?;
@@ -305,10 +282,7 @@ where
             }
         }
 
-        Ok(MapSerializer {
-            serializer: self,
-            len,
-        })
+        Ok(MapSerializer { serializer: self, len })
     }
 
     fn serialize_struct(self, _name: &'static str, len: usize) -> Result<Self::SerializeStruct> {
@@ -322,11 +296,7 @@ where
     }
 
     fn serialize_struct_variant(
-        self,
-        _name: &'static str,
-        variant_index: u32,
-        variant: &'static str,
-        len: usize,
+        self, _name: &'static str, variant_index: u32, variant: &'static str, len: usize,
     ) -> Result<Self::SerializeStructVariant> {
         if CFG::with_identifiers() {
             self.write_identifier(variant)?;

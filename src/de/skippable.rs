@@ -1,7 +1,6 @@
 //! Skippable blocks reader.
 
-use std::io::Read;
-use std::mem;
+use std::{io::Read, mem};
 
 use crate::{
     Error, Result,
@@ -109,11 +108,7 @@ impl<R: Read> SkipBlock<R> {
     const MAX_LEN: usize = u16::MAX as usize;
 
     fn new(inner: SkipStack<R>) -> Self {
-        Self {
-            inner: Box::new(inner),
-            remaining: 0,
-            has_next_block: true,
-        }
+        Self { inner: Box::new(inner), remaining: 0, has_next_block: true }
     }
 
     fn update_remaining(&mut self) -> Result<()> {

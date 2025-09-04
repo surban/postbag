@@ -21,8 +21,7 @@
 //! }
 //! ```
 
-use serde::Deserializer;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Serialize the integer value as a fixed-size array.
 pub fn serialize<S, T>(val: &T, serializer: S) -> Result<S::Ok, S::Error>

@@ -18,13 +18,9 @@ where
     println!("{serialized:02x?}");
     dbg!(serialized.len());
 
-    let deserialized: T =
-        from_slice_with_cfg::<_, CFG>(&serialized).expect("deserialization failed");
+    let deserialized: T = from_slice_with_cfg::<_, CFG>(&serialized).expect("deserialization failed");
 
-    assert_eq!(
-        *value, deserialized,
-        "deserialized value does not match original value"
-    );
+    assert_eq!(*value, deserialized, "deserialized value does not match original value");
 
     from_slice_with_cfg::<_, CFG>(&serialized).expect("deserialization to transformed type failed")
 }
@@ -49,11 +45,7 @@ fn changed_struct_fields() {
         4
     }
 
-    let a = A {
-        f1: 1,
-        f2: 2,
-        f3: 3,
-    };
+    let a = A { f1: 1, f2: 2, f3: 3 };
 
     let b: B = transform::<_, _, WithIdents>(&a);
 
@@ -83,11 +75,7 @@ fn added_struct_fields() {
         4
     }
 
-    let a = A {
-        f1: 1,
-        f2: 2,
-        f3: 3,
-    };
+    let a = A { f1: 1, f2: 2, f3: 3 };
 
     let b: B = transform::<_, _, WithIdents>(&a);
     assert_eq!(b.f1, a.f1);
@@ -127,17 +115,11 @@ fn changed_struct_variant_fields() {
     }
 
     let a_f2 = 2;
-    let a = A::V2 {
-        f1: 1,
-        f2: a_f2,
-        f3: 3,
-    };
+    let a = A::V2 { f1: 1, f2: a_f2, f3: 3 };
 
     let b: B = transform::<_, _, WithIdents>(&a);
 
-    let B::V2 { f2, f4 } = b else {
-        panic!("wrong variant")
-    };
+    let B::V2 { f2, f4 } = b else { panic!("wrong variant") };
     assert_eq!(f2, a_f2);
     assert_eq!(f4, f4_default());
 }
@@ -170,25 +152,17 @@ fn added_struct_variant_fields() {
     let a_f1 = 1;
     let a_f2 = 2;
     let a_f3 = 3;
-    let a = A::V2 {
-        f1: a_f1,
-        f2: a_f2,
-        f3: a_f3,
-    };
+    let a = A::V2 { f1: a_f1, f2: a_f2, f3: a_f3 };
 
     let b: B = transform::<_, _, WithIdents>(&a);
-    let B::V2 { f1, f2, f3, f4 } = b else {
-        panic!("wrong variant")
-    };
+    let B::V2 { f1, f2, f3, f4 } = b else { panic!("wrong variant") };
     assert_eq!(f1, a_f1);
     assert_eq!(f2, a_f2);
     assert_eq!(f3, a_f3);
     assert_eq!(f4, f4_default());
 
     let b: B = transform::<_, _, WithoutIdents>(&a);
-    let B::V2 { f1, f2, f3, f4 } = b else {
-        panic!("wrong variant")
-    };
+    let B::V2 { f1, f2, f3, f4 } = b else { panic!("wrong variant") };
     assert_eq!(f1, a_f1);
     assert_eq!(f2, a_f2);
     assert_eq!(f3, a_f3);
@@ -222,14 +196,7 @@ fn removed_struct_fields_nested_struct() {
         x: u32,
     }
 
-    let xa = XA {
-        a: A {
-            f1: 1,
-            f2: 2,
-            f3: 3,
-        },
-        x: 99,
-    };
+    let xa = XA { a: A { f1: 1, f2: 2, f3: 3 }, x: 99 };
 
     let xb: XB = transform::<_, _, WithIdents>(&xa);
     assert_eq!(xb.a.f1, xa.a.f1);
@@ -257,14 +224,7 @@ fn removed_struct_fields_nested_tuple() {
         f2: u32,
     }
 
-    let xa = (
-        A {
-            f1: 1,
-            f2: 2,
-            f3: 3,
-        },
-        99,
-    );
+    let xa = (A { f1: 1, f2: 2, f3: 3 }, 99);
 
     let xb: (B, u32) = transform::<_, _, WithIdents>(&xa);
     assert_eq!(xb.0.f1, xa.0.f1);

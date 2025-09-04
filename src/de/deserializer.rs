@@ -1,19 +1,16 @@
-use std::io::Read;
-use std::marker::PhantomData;
+use std::{io::Read, marker::PhantomData};
 
 use serde::de::{
     self, DeserializeSeed, IntoDeserializer, Visitor,
     value::{StringDeserializer, U32Deserializer},
 };
 
-use crate::{Cfg, ID_COUNT, ID_LEN, ID_LEN_NAME, cfg::DefaultCfg, de::skippable::SkipRead};
 use crate::{
-    FALSE, NONE, SOME, TRUE,
-    varint::{max_of_last_byte, varint_max},
-};
-use crate::{
-    SPECIAL_LEN, UNKNOWN_LEN,
+    Cfg, FALSE, ID_COUNT, ID_LEN, ID_LEN_NAME, NONE, SOME, SPECIAL_LEN, TRUE, UNKNOWN_LEN,
+    cfg::DefaultCfg,
+    de::skippable::SkipRead,
     error::{Error, Result},
+    varint::{max_of_last_byte, varint_max},
 };
 
 /// Deserializer.
@@ -29,11 +26,7 @@ where
 {
     /// Obtain a Deserializer from a reader.
     pub fn new(read: R) -> Self {
-        Deserializer {
-            input: SkipRead::new(read),
-            _de: PhantomData,
-            _cfg: PhantomData,
-        }
+        Deserializer { input: SkipRead::new(read), _de: PhantomData, _cfg: PhantomData }
     }
 
     /// Returns the reader.
@@ -132,11 +125,7 @@ impl<'de, R: Read, CFG: Cfg> Deserializer<'de, R, CFG> {
             return Ok(format!("_{id}"));
         }
 
-        let len = if v == ID_LEN {
-            self.try_take_varint_usize()?
-        } else {
-            v
-        };
+        let len = if v == ID_LEN { self.try_take_varint_usize()? } else { v };
 
         let bytes = self.input.read(len)?;
         String::from_utf8(bytes).map_err(|_| Error::BadIdentifier)
@@ -372,9 +361,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
         V: Visitor<'de>,
     {
         let bytes = self.input.read(4)?;
-        visitor.visit_f32(f32::from_bits(u32::from_le_bytes(
-            bytes.try_into().unwrap(),
-        )))
+        visitor.visit_f32(f32::from_bits(u32::from_le_bytes(bytes.try_into().unwrap())))
     }
 
     fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value>
@@ -382,9 +369,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
         V: Visitor<'de>,
     {
         let bytes = self.input.read(8)?;
-        visitor.visit_f64(f64::from_bits(u64::from_le_bytes(
-            bytes.try_into().unwrap(),
-        )))
+        visitor.visit_f64(f64::from_bits(u64::from_le_bytes(bytes.try_into().unwrap())))
     }
 
     fn deserialize_char<V>(self, visitor: V) -> Result<V::Value>
@@ -397,11 +382,8 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
         }
         let bytes = self.input.read(sz)?;
 
-        let character = core::str::from_utf8(&bytes)
-            .map_err(|_| Error::BadChar)?
-            .chars()
-            .next()
-            .ok_or(Error::BadChar)?;
+        let character =
+            core::str::from_utf8(&bytes).map_err(|_| Error::BadChar)?.chars().next().ok_or(Error::BadChar)?;
         visitor.visit_char(character)
     }
 
@@ -487,10 +469,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
             len => Some(len),
         };
 
-        let value = visitor.visit_seq(SeqAccess {
-            deserializer: self,
-            len,
-        })?;
+        let value = visitor.visit_seq(SeqAccess { deserializer: self, len })?;
 
         if len.is_none() {
             self.input.end_skippable()?;
@@ -503,18 +482,10 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        visitor.visit_seq(SeqAccess {
-            deserializer: self,
-            len: Some(len),
-        })
+        visitor.visit_seq(SeqAccess { deserializer: self, len: Some(len) })
     }
 
-    fn deserialize_tuple_struct<V>(
-        self,
-        _name: &'static str,
-        len: usize,
-        visitor: V,
-    ) -> Result<V::Value>
+    fn deserialize_tuple_struct<V>(self, _name: &'static str, len: usize, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
@@ -537,10 +508,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
             len => Some(len),
         };
 
-        let value = visitor.visit_map(MapAccess {
-            deserializer: self,
-            len,
-        })?;
+        let value = visitor.visit_map(MapAccess { deserializer: self, len })?;
 
         if len.is_none() {
             self.input.end_skippable()?;
@@ -550,10 +518,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     }
 
     fn deserialize_struct<V>(
-        self,
-        _name: &'static str,
-        _fields: &'static [&'static str],
-        visitor: V,
+        self, _name: &'static str, _fields: &'static [&'static str], visitor: V,
     ) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -561,26 +526,17 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
         let len = self.try_take_varint_usize()?;
 
         if CFG::with_identifiers() {
-            visitor.visit_map(StructFieldAccess {
-                deserializer: self,
-                len,
-            })
+            visitor.visit_map(StructFieldAccess { deserializer: self, len })
         } else {
             self.input.start_skippable();
-            let value = visitor.visit_seq(StructSeqAccess {
-                deserializer: self,
-                len,
-            })?;
+            let value = visitor.visit_seq(StructSeqAccess { deserializer: self, len })?;
             self.input.end_skippable()?;
             Ok(value)
         }
     }
 
     fn deserialize_enum<V>(
-        self,
-        _name: &'static str,
-        _variants: &'static [&'static str],
-        visitor: V,
+        self, _name: &'static str, _variants: &'static [&'static str], visitor: V,
     ) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -618,11 +574,7 @@ impl<'de, R: Read, CFG: Cfg> serde::de::VariantAccess<'de> for &mut Deserializer
         serde::de::Deserializer::deserialize_tuple(self, len, visitor)
     }
 
-    fn struct_variant<V: Visitor<'de>>(
-        self,
-        _fields: &'static [&'static str],
-        visitor: V,
-    ) -> Result<V::Value> {
+    fn struct_variant<V: Visitor<'de>>(self, _fields: &'static [&'static str], visitor: V) -> Result<V::Value> {
         serde::de::Deserializer::deserialize_struct(self, "", _fields, visitor)
     }
 }
