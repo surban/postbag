@@ -22,6 +22,8 @@ pub enum Error {
     DeserializeBadOption,
     /// Found an enum discriminant that was > `u32::MAX`
     DeserializeBadEnum,
+    /// Bad sequence length.
+    BadLen,
     /// Overflow of target usize.
     UsizeOverflow,
     /// Error while processing `collect_str` during serialization
@@ -58,6 +60,7 @@ impl Display for Error {
             DeserializeBadEnum => {
                 write!(f, "Found an enum discriminant that was > u32::max_value()")
             }
+            BadLen => write!(f, "bad sequence length"),
             UsizeOverflow => write!(f, "usize overflow"),
             Custom(msg) => write!(f, "serde error: {msg}"),
             CollectStrError => write!(

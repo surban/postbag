@@ -1,8 +1,8 @@
 use serde::{Serialize, ser};
 use std::{io::Write, marker::PhantomData};
 
-use crate::cfg::DefaultCfg;
-use crate::{Cfg, varint::*};
+use crate::{Cfg, UNKNOWN_LEN, varint::*};
+use crate::{SPECIAL_LEN, cfg::DefaultCfg};
 use crate::{
     error::{Error, Result},
     ser::skippable::SkipWrite,
@@ -74,16 +74,15 @@ impl<W: Write, CFG: Cfg> Serializer<W, CFG> {
     }
 }
 
-impl<W, CFG> ser::Serializer for &mut Serializer<W, CFG>
+impl<'a, W, CFG> ser::Serializer for &'a mut Serializer<W, CFG>
 where
     W: Write,
     CFG: Cfg,
 {
     type Ok = ();
-
     type Error = Error;
 
-    type SerializeSeq = Self;
+    type SerializeSeq = SeqSerializer<'a, W, CFG>;
     type SerializeTuple = Self;
     type SerializeTupleStruct = Self;
     type SerializeTupleVariant = Self;
@@ -232,8 +231,23 @@ where
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq> {
-        self.write_usize(len.ok_or(Error::SerializeSeqLengthUnknown)?)?;
-        Ok(self)
+        match len {
+            Some(SPECIAL_LEN) => {
+                self.write_usize(SPECIAL_LEN)?;
+                self.write_usize(SPECIAL_LEN)?;
+            }
+            Some(len) => self.write_usize(len)?,
+            None => {
+                self.write_usize(SPECIAL_LEN)?;
+                self.write_usize(UNKNOWN_LEN)?;
+                self.output.start_skippable();
+            }
+        }
+
+        Ok(SeqSerializer {
+            serializer: self,
+            len,
+        })
     }
 
     fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple> {
@@ -271,6 +285,11 @@ where
 
     fn serialize_struct(self, _name: &'static str, len: usize) -> Result<Self::SerializeStruct> {
         self.write_usize(len)?;
+
+        if !CFG::with_identifiers() {
+            self.output.start_skippable();
+        }
+
         Ok(self)
     }
 
@@ -288,6 +307,11 @@ where
         }
 
         self.write_usize(len)?;
+
+        if !CFG::with_identifiers() {
+            self.output.start_skippable();
+        }
+
         Ok(self)
     }
 
@@ -360,26 +384,31 @@ where
     }
 }
 
-impl<W, CFG> ser::SerializeSeq for &mut Serializer<W, CFG>
+pub struct SeqSerializer<'a, W, CFG> {
+    serializer: &'a mut Serializer<W, CFG>,
+    len: Option<usize>,
+}
+
+impl<'a, W, CFG> ser::SerializeSeq for SeqSerializer<'a, W, CFG>
 where
     W: Write,
     CFG: Cfg,
 {
-    // Must match the `Ok` type of the serializer.
     type Ok = ();
-    // Must match the `Error` type of the serializer.
     type Error = Error;
 
-    // Serialize a single element of the sequence.
     fn serialize_element<T>(&mut self, value: &T) -> Result<()>
     where
         T: ?Sized + Serialize,
     {
-        value.serialize(&mut **self)
+        value.serialize(&mut *self.serializer)
     }
 
-    // Close the sequence.
     fn end(self) -> Result<()> {
+        if self.len.is_none() {
+            self.serializer.output.end_skippable()?;
+        }
+
         Ok(())
     }
 }
@@ -485,16 +514,23 @@ where
     {
         if CFG::with_identifiers() {
             key.serialize(&mut **self)?;
+            self.output.start_skippable();
         }
 
-        self.output.start_skippable();
         value.serialize(&mut **self)?;
-        self.output.end_skippable()?;
+
+        if CFG::with_identifiers() {
+            self.output.end_skippable()?;
+        }
 
         Ok(())
     }
 
     fn end(self) -> Result<()> {
+        if !CFG::with_identifiers() {
+            self.output.end_skippable()?;
+        }
+
         Ok(())
     }
 }
@@ -513,16 +549,23 @@ where
     {
         if CFG::with_identifiers() {
             key.serialize(&mut **self)?;
+            self.output.start_skippable();
         }
 
-        self.output.start_skippable();
         value.serialize(&mut **self)?;
-        self.output.end_skippable()?;
+
+        if CFG::with_identifiers() {
+            self.output.end_skippable()?;
+        }
 
         Ok(())
     }
 
     fn end(self) -> Result<()> {
+        if !CFG::with_identifiers() {
+            self.output.end_skippable()?;
+        }
+
         Ok(())
     }
 }

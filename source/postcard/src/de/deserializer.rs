@@ -3,9 +3,12 @@ use serde::de::{
     value::{StringDeserializer, U32Deserializer},
 };
 
-use crate::error::{Error, Result};
 use crate::varint::{max_of_last_byte, varint_max};
 use crate::{Cfg, cfg::DefaultCfg, de::skippable::SkipRead};
+use crate::{
+    SPECIAL_LEN, UNKNOWN_LEN,
+    error::{Error, Result},
+};
 use core::marker::PhantomData;
 use std::io::Read;
 
@@ -119,24 +122,30 @@ impl<'de, R: Read, CFG: Cfg> Deserializer<'de, R, CFG> {
 
 struct SeqAccess<'a, 'b, R, CFG> {
     deserializer: &'a mut Deserializer<'b, R, CFG>,
-    len: usize,
+    len: Option<usize>,
 }
 
 impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::SeqAccess<'b> for SeqAccess<'a, 'b, R, CFG> {
     type Error = Error;
 
     fn next_element_seed<V: DeserializeSeed<'b>>(&mut self, seed: V) -> Result<Option<V::Value>> {
-        if self.len > 0 {
-            self.len -= 1;
-            let data = DeserializeSeed::deserialize(seed, &mut *self.deserializer)?;
-            Ok(Some(data))
-        } else {
-            Ok(None)
+        match &mut self.len {
+            Some(0) => Ok(None),
+            Some(len) => {
+                *len -= 1;
+                let data = DeserializeSeed::deserialize(seed, &mut *self.deserializer)?;
+                Ok(Some(data))
+            }
+            None => match DeserializeSeed::deserialize(seed, &mut *self.deserializer) {
+                Ok(data) => Ok(Some(data)),
+                Err(Error::DeserializeUnexpectedEnd) => Ok(None),
+                Err(err) => Err(err),
+            },
         }
     }
 
     fn size_hint(&self) -> Option<usize> {
-        Some(self.len)
+        self.len
     }
 }
 
@@ -149,11 +158,11 @@ impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::SeqAccess<'b> for StructSeqAccess
     type Error = Error;
 
     fn next_element_seed<V: DeserializeSeed<'b>>(&mut self, seed: V) -> Result<Option<V::Value>> {
+        assert!(!CFG::with_identifiers());
+
         if self.len > 0 {
             self.len -= 1;
-            self.deserializer.input.start_skippable();
             let data = DeserializeSeed::deserialize(seed, &mut *self.deserializer)?;
-            self.deserializer.input.end_skippable()?;
             Ok(Some(data))
         } else {
             Ok(None)
@@ -184,9 +193,12 @@ impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::MapAccess<'b> for StructFieldAcce
     }
 
     fn next_value_seed<V: DeserializeSeed<'b>>(&mut self, seed: V) -> Result<V::Value> {
+        assert!(CFG::with_identifiers());
+
         self.deserializer.input.start_skippable();
         let value = DeserializeSeed::deserialize(seed, &mut *self.deserializer)?;
         self.deserializer.input.end_skippable()?;
+
         Ok(value)
     }
 
@@ -446,7 +458,17 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        let len = self.try_take_varint_usize()?;
+        let len = match self.try_take_varint_usize()? {
+            SPECIAL_LEN => match self.try_take_varint_usize()? {
+                SPECIAL_LEN => Some(SPECIAL_LEN),
+                UNKNOWN_LEN => {
+                    self.input.start_skippable();
+                    None
+                }
+                _ => return Err(Error::BadLen),
+            },
+            len => Some(len),
+        };
 
         visitor.visit_seq(SeqAccess {
             deserializer: self,
@@ -460,7 +482,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     {
         visitor.visit_seq(SeqAccess {
             deserializer: self,
-            len,
+            len: Some(len),
         })
     }
 
@@ -505,10 +527,13 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
                 len,
             })
         } else {
-            visitor.visit_seq(StructSeqAccess {
+            self.input.start_skippable();
+            let value = visitor.visit_seq(StructSeqAccess {
                 deserializer: self,
                 len,
-            })
+            })?;
+            self.input.end_skippable()?;
+            Ok(value)
         }
     }
 
@@ -539,6 +564,8 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
+        println!("deserialize_ignored_any");
+
         // end_skippable() will discard the data.
         visitor.visit_unit()
     }

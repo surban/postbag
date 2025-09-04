@@ -13,3 +13,6 @@ pub use cfg::{Cfg, Config, DefaultCfg};
 pub use de::{from_io, from_io_with_cfg, from_slice, from_slice_with_cfg};
 pub use error::{Error, Result};
 pub use ser::{to_io, to_io_with_cfg, to_vec, to_vec_with_cfg};
+
+const SPECIAL_LEN: usize = 125;
+const UNKNOWN_LEN: usize = 0;

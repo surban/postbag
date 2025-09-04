@@ -437,6 +437,14 @@ fn collections_byte_slices_and_vecs() {
 }
 
 #[test]
+fn collections_seq_special() {
+    loopback(vec![1; 0]);
+    loopback(vec![1; 124]);
+    loopback(vec![1; 125]);
+    loopback(vec![1; 126]);
+}
+
+#[test]
 fn collections_maps() {
     let mut input: BTreeMap<u8, u8> = BTreeMap::new();
     input.insert(0x01, 0x05);
@@ -444,6 +452,17 @@ fn collections_maps() {
     input.insert(0x03, 0x07);
     input.insert(0x04, 0x08);
     loopback(input);
+}
+
+#[test]
+fn collections_maps_special() {
+    for len in [0, 124, 125, 126] {
+        let mut input: BTreeMap<u8, u8> = BTreeMap::new();
+        for i in 0..len {
+            input.insert(i, i);
+        }
+        loopback(input);
+    }
 }
 
 #[test]

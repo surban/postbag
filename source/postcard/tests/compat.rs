@@ -193,3 +193,88 @@ fn added_struct_variant_fields() {
     assert_eq!(f3, a_f3);
     assert_eq!(f4, f4_default());
 }
+
+#[test]
+fn removed_struct_fields_nested_struct() {
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    struct A {
+        f1: u32,
+        f2: u32,
+        f3: u32,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    struct XA {
+        a: A,
+        x: u32,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    struct B {
+        f1: u32,
+        f2: u32,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    struct XB {
+        a: B,
+        x: u32,
+    }
+
+    let xa = XA {
+        a: A {
+            f1: 1,
+            f2: 2,
+            f3: 3,
+        },
+        x: 99,
+    };
+
+    let data = to_vec_with_cfg::<_, WithoutIdents>(&xa).unwrap();
+    let xb: XB = from_slice_with_cfg::<_, WithoutIdents>(&data).unwrap();
+    assert_eq!(xb.a.f1, xa.a.f1);
+    assert_eq!(xb.a.f2, xa.a.f2);
+    assert_eq!(xb.x, xa.x);
+
+    dbg!(xb);
+    //
+    //     let b: B = transform::<_, _, WithoutIdents>(&a);
+    //     assert_eq!(b.f1, a.f1);
+    //     assert_eq!(b.f2, a.f2);
+}
+
+#[test]
+fn removed_struct_fields_nested_tuple() {
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    struct A {
+        f1: u32,
+        f2: u32,
+        f3: u32,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    struct B {
+        f1: u32,
+        f2: u32,
+    }
+
+    let xa = (
+        A {
+            f1: 1,
+            f2: 2,
+            f3: 3,
+        },
+        99,
+    );
+
+    let data = to_vec_with_cfg::<_, WithIdents>(&xa).unwrap();
+    let xb: (B, u32) = from_slice_with_cfg::<_, WithIdents>(&data).unwrap();
+    assert_eq!(xb.0.f1, xa.0.f1);
+    assert_eq!(xb.0.f2, xa.0.f2);
+    assert_eq!(xb.1, xa.1);
+
+    //
+    //     let b: B = transform::<_, _, WithoutIdents>(&a);
+    //     assert_eq!(b.f1, a.f1);
+    //     assert_eq!(b.f2, a.f2);
+}
