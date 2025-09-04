@@ -1,4 +1,4 @@
-//! Remoc codec.
+//! Postbag is a [serde] codec.
 
 mod cfg;
 mod de;

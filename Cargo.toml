@@ -1,23 +1,20 @@
 [package]
-name = "remoc-codec"
+name = "postbag"
 version = "0.1.0"
-authors = ["James Munns <james@onevariable.com>", "Sebastian Urban <surban@surban.net>"]
+authors = [
+    "James Munns <james@onevariable.com>",
+    "Sebastian Urban <surban@surban.net>",
+]
 edition = "2024"
 readme = "README.md"
-repository = "https://github.com/surban/remoc-codec"
-description = "Codec for Remoc"
+repository = "https://github.com/surban/postbag"
+description = "Postbag Serde Codec"
 license = "Apache-2.0"
-categories = [
-    "embedded",
-    "no-std",
-]
-keywords = [
-    "serde",
-]
+categories = ["encoding"]
+keywords = ["serde"]
 
 [dependencies]
 serde = "1.0.219"
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
-
