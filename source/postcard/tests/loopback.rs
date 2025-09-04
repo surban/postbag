@@ -907,3 +907,18 @@ fn varint_boundary_tests() {
     let deser: postcard::Result<u32> = from_slice(&[0xFF, 0xFF, 0xFF, 0xFF, 0x1F]);
     assert!(matches!(deser, Err(Error::BadVarint)));
 }
+
+// =============================================================================
+// Fixed int encoding
+// =============================================================================
+
+#[test]
+fn fixed_int() {
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    pub struct DefinitelyLE {
+        #[serde(with = "postcard::fixint")]
+        x: u16,
+    }
+
+    loopback(DefinitelyLE { x: 0xABCD });
+}
