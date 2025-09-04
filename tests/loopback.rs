@@ -1,9 +1,10 @@
-use postcard::{Cfg, Config, Error, from_slice, from_slice_with_cfg, to_vec_with_cfg};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
 use std::fmt::Debug;
 use std::fmt::Write;
 use std::marker::PhantomData;
 use std::{collections::BTreeMap, io::ErrorKind};
+
+use remoc_codec::{Cfg, Config, Error, from_slice, from_slice_with_cfg, to_vec_with_cfg};
 
 /// Performs serialization followed by deserialization and checks that the
 /// deserialized value is unchanged.
@@ -467,7 +468,7 @@ fn id_enum_fields() {
 
 #[test]
 fn collections_strings() {
-    let input: &str = "hello, postcard!";
+    let input: &str = "hello, remoc-codec!";
     loopback(input.to_string());
 
     let mut input: String = String::new();
@@ -696,7 +697,7 @@ fn sequences_unknown_length() {
     let string_seq = UnknownLengthSeq::new(vec![
         "hello".to_string(),
         "world".to_string(),
-        "postcard".to_string(),
+        "remoc-codec".to_string(),
     ]);
     loopback(string_seq);
 
@@ -829,7 +830,7 @@ fn maps_unknown_length() {
     // Test map with string keys and values
     let mut string_map_data = BTreeMap::new();
     string_map_data.insert("hello".to_string(), "world".to_string());
-    string_map_data.insert("postcard".to_string(), "serde".to_string());
+    string_map_data.insert("remoc-codec".to_string(), "serde".to_string());
     string_map_data.insert("rust".to_string(), "language".to_string());
     let string_map = UnknownLengthMap::new(string_map_data);
     loopback(string_map);
@@ -904,7 +905,7 @@ fn error_handling_vec_bounds() {
 fn varint_boundary_tests() {
     loopback(u32::MAX);
 
-    let deser: postcard::Result<u32> = from_slice(&[0xFF, 0xFF, 0xFF, 0xFF, 0x1F]);
+    let deser: remoc_codec::Result<u32> = from_slice(&[0xFF, 0xFF, 0xFF, 0xFF, 0x1F]);
     assert!(matches!(deser, Err(Error::BadVarint)));
 }
 
@@ -916,7 +917,7 @@ fn varint_boundary_tests() {
 fn fixed_int() {
     #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
     pub struct DefinitelyLE {
-        #[serde(with = "postcard::fixint")]
+        #[serde(with = "remoc_codec::fixint")]
         x: u16,
     }
 

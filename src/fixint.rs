@@ -1,13 +1,13 @@
 //! # Fixed Size Integers
 //!
 //! In some cases, the use of variably length encoded data may not be
-//! preferable. These modules, for use with `#[serde(with = "postcard::fixint")]`
+//! preferable. These modules, for use with `#[serde(with = "remoc_codec::fixint")]`
 //! "opt out" of variable length encoding.
 //!
 //! Disables varint serialization/deserialization for the specified integer
 //! field. The integer will always be serialized in the same way as a fixed
 //! size array.
-//! 
+//!
 //! Support explicitly not provided for `usize` or `isize`, as
 //! these types would not be portable between systems of different
 //! pointer widths.
@@ -16,7 +16,7 @@
 //! # use serde::Serialize;
 //! #[derive(Serialize)]
 //! pub struct DefinitelyFixInt {
-//!     #[serde(with = "postcard::fixint")]
+//!     #[serde(with = "remoc_codec::fixint")]
 //!     x: u16,
 //! }
 //! ```

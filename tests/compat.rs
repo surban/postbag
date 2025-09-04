@@ -1,6 +1,7 @@
-use postcard::{Cfg, Config, from_slice_with_cfg, to_vec_with_cfg};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
+
+use remoc_codec::{Cfg, Config, from_slice_with_cfg, to_vec_with_cfg};
 
 type WithIdents = Config<true>;
 type WithoutIdents = Config<false>;

@@ -121,7 +121,7 @@ impl<R: Read> SkipBlock<R> {
             return Ok(());
         }
 
-        self.remaining = self.inner.try_take_varint_u16()?.try_into().unwrap();
+        self.remaining = self.inner.try_take_varint_u16()?.into();
         self.has_next_block = self.remaining == Self::MAX_LEN;
 
         Ok(())
