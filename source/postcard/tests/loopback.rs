@@ -408,6 +408,59 @@ fn long_struct_fields() {
     });
 }
 
+#[test]
+fn id_struct_fields() {
+    #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+    struct IdFields {
+        #[serde(rename = "_0")]
+        my_long_field1: u8,
+        #[serde(rename = "_2")]
+        my_long_field2: u8,
+        #[serde(rename = "_59")]
+        my_long_field3: u8,
+        #[serde(rename = "_60")]
+        my_long_field4: u8,
+    }
+
+    loopback(IdFields {
+        my_long_field1: 1,
+        my_long_field2: 2,
+        my_long_field3: 3,
+        my_long_field4: 4,
+    });
+}
+
+#[test]
+fn id_enum_fields() {
+    #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+    enum IdEnum {
+        #[serde(rename = "_0")]
+        MyLongVariant1,
+        #[serde(rename = "_1")]
+        MyLongVariant2(),
+        #[serde(rename = "_2")]
+        MyLongVariant3(u8),
+        #[serde(rename = "_3")]
+        MyLongVariant4((u8, u8)),
+        #[serde(rename = "_4")]
+        MyLongVariant5 {
+            #[serde(rename = "_0")]
+            long_field_name_a: u8,
+            #[serde(rename = "_1")]
+            long_field_name_b: u8,
+        },
+    }
+
+    loopback(IdEnum::MyLongVariant1);
+    loopback(IdEnum::MyLongVariant2());
+    loopback(IdEnum::MyLongVariant3(1));
+    loopback(IdEnum::MyLongVariant4((2, 3)));
+    loopback(IdEnum::MyLongVariant5 {
+        long_field_name_a: 4,
+        long_field_name_b: 4,
+    });
+}
+
 // =============================================================================
 // Collection Tests
 // =============================================================================

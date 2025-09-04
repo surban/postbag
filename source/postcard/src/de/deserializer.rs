@@ -119,6 +119,28 @@ impl<'de, R: Read, CFG: Cfg> Deserializer<'de, R, CFG> {
         }
         Err(Error::BadVarint)
     }
+
+    fn read_identifier(&mut self) -> Result<String> {
+        let v = self.try_take_varint_usize()?;
+
+        if v >= ID_LEN_NAME + ID_COUNT {
+            return Err(Error::BadIdentifier);
+        }
+
+        if v >= ID_LEN_NAME {
+            let id = v - ID_LEN_NAME;
+            return Ok(format!("_{id}"));
+        }
+
+        let len = if v == ID_LEN {
+            self.try_take_varint_usize()?
+        } else {
+            v
+        };
+
+        let bytes = self.input.read(len)?;
+        String::from_utf8(bytes).map_err(|_| Error::BadIdentifier)
+    }
 }
 
 struct SeqAccess<'a, 'b, R, CFG> {
@@ -570,27 +592,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        let v = self.try_take_varint_usize()?;
-
-        if v >= ID_LEN_NAME + ID_COUNT {
-            return Err(Error::BadIdentifier);
-        }
-
-        if v >= ID_LEN_NAME {
-            let id = v - ID_LEN_NAME;
-            return visitor.visit_string(format!("_{id}"));
-        }
-
-        let len = if v == ID_LEN {
-            self.try_take_varint_usize()?
-        } else {
-            v
-        };
-
-        let bytes = self.input.read(len)?;
-        let str_sl = String::from_utf8(bytes).map_err(|_| Error::BadIdentifier)?;
-
-        visitor.visit_string(str_sl)
+        visitor.visit_string(self.read_identifier()?)
     }
 
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value>
@@ -631,10 +633,8 @@ impl<'de, R: Read, CFG: Cfg> serde::de::EnumAccess<'de> for &mut Deserializer<'d
 
     fn variant_seed<V: DeserializeSeed<'de>>(self, seed: V) -> Result<(V::Value, Self)> {
         let v = if CFG::with_identifiers() {
-            let sz = self.try_take_varint_usize()?;
-            let bytes = self.input.read(sz)?;
-            let str_sl = String::from_utf8(bytes).map_err(|_| Error::BadString)?;
-            let deserializer: StringDeserializer<Error> = str_sl.into_deserializer();
+            let ident = self.read_identifier()?;
+            let deserializer: StringDeserializer<Error> = ident.into_deserializer();
             DeserializeSeed::deserialize(seed, deserializer)?
         } else {
             let varint = self.read_varint_u32()?;

@@ -18,7 +18,7 @@ const UNKNOWN_LEN: usize = 0;
 
 const ID_LEN: usize = 64;
 const ID_LEN_NAME: usize = ID_LEN + 1;
-const ID_COUNT: usize = 32;
+const ID_COUNT: usize = 60;
 
 pub use cfg::{Cfg, Config, DefaultCfg};
 pub use de::{from_io, from_io_with_cfg, from_slice, from_slice_with_cfg};
