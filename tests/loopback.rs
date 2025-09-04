@@ -499,7 +499,7 @@ pub struct ByteSliceStruct {
 }
 
 impl Serialize for ByteSliceStruct {
-    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -510,7 +510,7 @@ impl Serialize for ByteSliceStruct {
 }
 
 impl<'de> Deserialize<'de> for ByteSliceStruct {
-    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -563,7 +563,7 @@ impl<T> Serialize for UnknownLengthSeq<T>
 where
     T: Serialize,
 {
-    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -581,7 +581,7 @@ impl<'de, T> Deserialize<'de> for UnknownLengthSeq<T>
 where
     T: Deserialize<'de>,
 {
-    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -686,7 +686,7 @@ where
     K: Serialize,
     V: Serialize,
 {
-    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -705,7 +705,7 @@ where
     K: Deserialize<'de> + Ord,
     V: Deserialize<'de>,
 {
-    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
