@@ -1,7 +1,6 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
-
-//! Postbag is a [serde] codec.
+#![doc = include_str!("../README.md")]
 
 pub mod cfg;
 mod de;
@@ -30,7 +29,7 @@ pub use ser::serialize;
 /// Serialize with identifiers.
 ///
 /// Struct field identifiers and enum variant identifiers are serialized
-/// as strings.
+/// as strings or using numerical identifier encoding.
 pub type Full = cfg::StaticCfg<true>;
 
 /// Serialize without identifiers.
