@@ -27,14 +27,14 @@ pub enum Error {
     /// Overflow of target usize
     UsizeOverflow,
     /// Serde custom error
-    Custom(String),
+    Custom,
     /// I/O error.
-    Io(std::io::Error),
+    Io,
 }
 
 impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Self {
-        Self::Io(err)
+    fn from(_err: std::io::Error) -> Self {
+        Self::Io
     }
 }
 
@@ -53,27 +53,27 @@ impl Display for Error {
             BadEnum => write!(f, "invalid enum discriminant"),
             BadLen => write!(f, "invalid length"),
             UsizeOverflow => write!(f, "usize overflow"),
-            Custom(msg) => write!(f, "serde error: {msg}"),
-            Io(err) => write!(f, "IO error: {err}"),
+            Custom => write!(f, "serde error"),
+            Io => write!(f, "IO error"),
         }
     }
 }
 
 impl serde::ser::Error for Error {
-    fn custom<T>(msg: T) -> Self
+    fn custom<T>(_msg: T) -> Self
     where
         T: Display,
     {
-        Error::Custom(msg.to_string())
+        Error::Custom
     }
 }
 
 impl serde::de::Error for Error {
-    fn custom<T>(msg: T) -> Self
+    fn custom<T>(_msg: T) -> Self
     where
         T: Display,
     {
-        Error::Custom(msg.to_string())
+        Error::Custom
     }
 }
 
