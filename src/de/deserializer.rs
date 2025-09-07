@@ -7,14 +7,14 @@ use serde::de::{
 
 use crate::{
     Cfg, FALSE, ID_COUNT, ID_LEN, ID_LEN_NAME, NONE, SOME, SPECIAL_LEN, TRUE, UNKNOWN_LEN,
-    cfg::DefaultCfg,
+    cfg::Full,
     de::skippable::SkipRead,
     error::{Error, Result},
     varint::{max_of_last_byte, varint_max},
 };
 
 /// Deserializer.
-pub struct Deserializer<'de, R, CFG = DefaultCfg> {
+pub struct Deserializer<'de, R, CFG = Full> {
     input: SkipRead<R>,
     _de: PhantomData<&'de ()>,
     _cfg: PhantomData<CFG>,
@@ -36,7 +36,7 @@ where
 }
 
 impl<'de, R: Read, CFG: Cfg> Deserializer<'de, R, CFG> {
-    fn try_take_varint_usize(&mut self) -> Result<usize> {
+    fn read_varint_usize(&mut self) -> Result<usize> {
         let value = self.read_varint_u64()?;
         usize::try_from(value).map_err(|_| Error::UsizeOverflow)
     }
@@ -114,7 +114,7 @@ impl<'de, R: Read, CFG: Cfg> Deserializer<'de, R, CFG> {
     }
 
     fn read_identifier(&mut self) -> Result<String> {
-        let v = self.try_take_varint_usize()?;
+        let v = self.read_varint_usize()?;
 
         if v >= ID_LEN_NAME + ID_COUNT {
             return Err(Error::BadIdentifier);
@@ -125,7 +125,7 @@ impl<'de, R: Read, CFG: Cfg> Deserializer<'de, R, CFG> {
             return Ok(format!("_{id}"));
         }
 
-        let len = if v == ID_LEN { self.try_take_varint_usize()? } else { v };
+        let len = if v == ID_LEN { self.read_varint_usize()? } else { v };
 
         let bytes = self.input.read(len)?;
         String::from_utf8(bytes).map_err(|_| Error::BadIdentifier)
@@ -170,7 +170,7 @@ impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::SeqAccess<'b> for StructSeqAccess
     type Error = Error;
 
     fn next_element_seed<V: DeserializeSeed<'b>>(&mut self, seed: V) -> Result<Option<V::Value>> {
-        assert!(!CFG::with_identifiers());
+        assert!(!CFG::with_idents());
 
         if self.len > 0 {
             self.len -= 1;
@@ -205,7 +205,7 @@ impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::MapAccess<'b> for StructFieldAcce
     }
 
     fn next_value_seed<V: DeserializeSeed<'b>>(&mut self, seed: V) -> Result<V::Value> {
-        assert!(CFG::with_identifiers());
+        assert!(CFG::with_idents());
 
         self.deserializer.input.start_skippable();
         let value = DeserializeSeed::deserialize(seed, &mut *self.deserializer)?;
@@ -376,7 +376,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        let sz = self.try_take_varint_usize()?;
+        let sz = self.read_varint_usize()?;
         if sz > 4 {
             return Err(Error::BadChar);
         }
@@ -398,7 +398,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        let sz = self.try_take_varint_usize()?;
+        let sz = self.read_varint_usize()?;
         let bytes = self.input.read(sz)?;
         let str_sl = String::from_utf8(bytes).map_err(|_| Error::BadString)?;
 
@@ -416,7 +416,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        let sz = self.try_take_varint_usize()?;
+        let sz = self.read_varint_usize()?;
         let bytes = self.input.read(sz)?;
         visitor.visit_byte_buf(bytes)
     }
@@ -457,8 +457,8 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        let len = match self.try_take_varint_usize()? {
-            SPECIAL_LEN => match self.try_take_varint_usize()? {
+        let len = match self.read_varint_usize()? {
+            SPECIAL_LEN => match self.read_varint_usize()? {
                 SPECIAL_LEN => Some(SPECIAL_LEN),
                 UNKNOWN_LEN => {
                     self.input.start_skippable();
@@ -496,8 +496,8 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        let len = match self.try_take_varint_usize()? {
-            SPECIAL_LEN => match self.try_take_varint_usize()? {
+        let len = match self.read_varint_usize()? {
+            SPECIAL_LEN => match self.read_varint_usize()? {
                 SPECIAL_LEN => Some(SPECIAL_LEN),
                 UNKNOWN_LEN => {
                     self.input.start_skippable();
@@ -523,9 +523,9 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     where
         V: Visitor<'de>,
     {
-        let len = self.try_take_varint_usize()?;
+        let len = self.read_varint_usize()?;
 
-        if CFG::with_identifiers() {
+        if CFG::with_idents() {
             visitor.visit_map(StructFieldAccess { deserializer: self, len })
         } else {
             self.input.start_skippable();
@@ -584,7 +584,7 @@ impl<'de, R: Read, CFG: Cfg> serde::de::EnumAccess<'de> for &mut Deserializer<'d
     type Variant = Self;
 
     fn variant_seed<V: DeserializeSeed<'de>>(self, seed: V) -> Result<(V::Value, Self)> {
-        let v = if CFG::with_identifiers() {
+        let v = if CFG::with_idents() {
             let ident = self.read_identifier()?;
             let deserializer: StringDeserializer<Error> = ident.into_deserializer();
             DeserializeSeed::deserialize(seed, deserializer)?

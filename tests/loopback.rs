@@ -6,7 +6,7 @@ use std::{
     marker::PhantomData,
 };
 
-use postbag::{Cfg, Config, Error, from_slice, from_slice_with_cfg, to_vec_with_cfg};
+use postbag::{Cfg, Config, Error, Slim, deserialize, serialize};
 
 /// Performs serialization followed by deserialization and checks that the
 /// deserialized value is unchanged.
@@ -16,11 +16,12 @@ where
     T: Serialize + DeserializeOwned + Debug + Eq,
     CFG: Cfg,
 {
-    let serialized = to_vec_with_cfg::<_, CFG>(&value).expect("serialization failed");
+    let mut serialized = Vec::new();
+    serialize::<CFG, _, _>(value, &mut serialized).expect("serialization failed");
     println!("{serialized:02x?}");
     dbg!(serialized.len());
 
-    let deserialized: T = from_slice_with_cfg::<_, CFG>(&serialized).expect("deserialization failed");
+    let deserialized: T = deserialize::<CFG, _, _>(serialized.as_slice()).expect("deserialization failed");
 
     assert_eq!(*value, deserialized, "deserialized value does not match original value");
 }
@@ -829,7 +830,7 @@ fn error_handling_vec_bounds() {
     // This won't actually prove anything since tests will likely always be
     // run on devices with larger amounts of memory, but it can't hurt.
     assert!(matches!(
-        from_slice::<Vec<u8>>(&[(1 << 7) | 8, 255, 255, 255, 0, 0, 0, 0, 0]),
+        deserialize::<Slim, Vec<u8>, _>([(1 << 7) | 8, 255, 255, 255, 0, 0, 0, 0, 0].as_slice()),
         Err(Error::Io(io)) if io.kind() == ErrorKind::UnexpectedEof
     ));
 }
@@ -838,7 +839,7 @@ fn error_handling_vec_bounds() {
 fn varint_boundary_tests() {
     loopback(u32::MAX);
 
-    let deser: postbag::Result<u32> = from_slice(&[0xFF, 0xFF, 0xFF, 0xFF, 0x1F]);
+    let deser = deserialize::<Slim, u32, _>([0xFF, 0xFF, 0xFF, 0xFF, 0x1F].as_slice());
     assert!(matches!(deser, Err(Error::BadVarint)));
 }
 

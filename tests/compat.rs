@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 
-use postbag::{Cfg, Config, from_slice_with_cfg, to_vec_with_cfg};
+use postbag::{Cfg, Config, deserialize, serialize};
 
 type WithIdents = Config<true>;
 type WithoutIdents = Config<false>;
@@ -14,15 +14,16 @@ where
     R: DeserializeOwned,
     CFG: Cfg,
 {
-    let serialized = to_vec_with_cfg::<_, CFG>(&value).expect("serialization failed");
+    let mut serialized = Vec::new();
+    serialize::<CFG, _, _>(&value, &mut serialized).expect("serialization failed");
     println!("{serialized:02x?}");
     dbg!(serialized.len());
 
-    let deserialized: T = from_slice_with_cfg::<_, CFG>(&serialized).expect("deserialization failed");
+    let deserialized: T = deserialize::<CFG, _, _>(serialized.as_slice()).expect("deserialization failed");
 
     assert_eq!(*value, deserialized, "deserialized value does not match original value");
 
-    from_slice_with_cfg::<_, CFG>(&serialized).expect("deserialization to transformed type failed")
+    deserialize::<CFG, _, _>(serialized.as_slice()).expect("deserialization to transformed type failed")
 }
 
 #[test]

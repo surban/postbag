@@ -1,3 +1,6 @@
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
+
 //! Postbag is a [serde] codec.
 
 mod cfg;
@@ -20,7 +23,7 @@ const ID_LEN: usize = 64;
 const ID_LEN_NAME: usize = ID_LEN + 1;
 const ID_COUNT: usize = 60;
 
-pub use cfg::{Cfg, Config, DefaultCfg};
-pub use de::{from_io, from_io_with_cfg, from_slice, from_slice_with_cfg};
+pub use cfg::{Cfg, Config, Full, Slim};
+pub use de::deserialize;
 pub use error::{Error, Result};
-pub use ser::{to_io, to_io_with_cfg, to_vec, to_vec_with_cfg};
+pub use ser::serialize;

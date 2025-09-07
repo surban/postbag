@@ -4,14 +4,14 @@ use serde::{Serialize, ser};
 
 use crate::{
     Cfg, FALSE, ID_COUNT, ID_LEN, ID_LEN_NAME, NONE, SOME, SPECIAL_LEN, TRUE, UNKNOWN_LEN,
-    cfg::DefaultCfg,
+    cfg::Full,
     error::{Error, Result},
     ser::skippable::SkipWrite,
     varint::*,
 };
 
 /// Serializer
-pub struct Serializer<W, CFG = DefaultCfg> {
+pub struct Serializer<W, CFG = Full> {
     output: SkipWrite<W>,
     _cfg: PhantomData<CFG>,
 }
@@ -200,7 +200,7 @@ where
     fn serialize_unit_variant(
         self, _name: &'static str, variant_index: u32, variant: &'static str,
     ) -> Result<()> {
-        if CFG::with_identifiers() {
+        if CFG::with_idents() {
             self.write_identifier(variant)?;
         } else {
             self.write_u32(variant_index)?;
@@ -221,7 +221,7 @@ where
     where
         T: ?Sized + Serialize,
     {
-        if CFG::with_identifiers() {
+        if CFG::with_idents() {
             self.write_identifier(variant)?;
         } else {
             self.write_u32(variant_index)?;
@@ -259,7 +259,7 @@ where
     fn serialize_tuple_variant(
         self, _name: &'static str, variant_index: u32, variant: &'static str, _len: usize,
     ) -> Result<Self::SerializeTupleVariant> {
-        if CFG::with_identifiers() {
+        if CFG::with_idents() {
             self.write_identifier(variant)?;
         } else {
             self.write_u32(variant_index)?;
@@ -288,7 +288,7 @@ where
     fn serialize_struct(self, _name: &'static str, len: usize) -> Result<Self::SerializeStruct> {
         self.write_usize(len)?;
 
-        if !CFG::with_identifiers() {
+        if !CFG::with_idents() {
             self.output.start_skippable();
         }
 
@@ -298,7 +298,7 @@ where
     fn serialize_struct_variant(
         self, _name: &'static str, variant_index: u32, variant: &'static str, len: usize,
     ) -> Result<Self::SerializeStructVariant> {
-        if CFG::with_identifiers() {
+        if CFG::with_idents() {
             self.write_identifier(variant)?;
         } else {
             self.write_u32(variant_index)?;
@@ -306,7 +306,7 @@ where
 
         self.write_usize(len)?;
 
-        if !CFG::with_identifiers() {
+        if !CFG::with_idents() {
             self.output.start_skippable();
         }
 
@@ -451,14 +451,14 @@ where
     where
         T: ?Sized + Serialize,
     {
-        if CFG::with_identifiers() {
+        if CFG::with_idents() {
             self.write_identifier(key)?;
             self.output.start_skippable();
         }
 
         value.serialize(&mut **self)?;
 
-        if CFG::with_identifiers() {
+        if CFG::with_idents() {
             self.output.end_skippable()?;
         }
 
@@ -466,7 +466,7 @@ where
     }
 
     fn end(self) -> Result<()> {
-        if !CFG::with_identifiers() {
+        if !CFG::with_idents() {
             self.output.end_skippable()?;
         }
 
@@ -486,14 +486,14 @@ where
     where
         T: ?Sized + Serialize,
     {
-        if CFG::with_identifiers() {
+        if CFG::with_idents() {
             self.write_identifier(key)?;
             self.output.start_skippable();
         }
 
         value.serialize(&mut **self)?;
 
-        if CFG::with_identifiers() {
+        if CFG::with_idents() {
             self.output.end_skippable()?;
         }
 
@@ -501,7 +501,7 @@ where
     }
 
     fn end(self) -> Result<()> {
-        if !CFG::with_identifiers() {
+        if !CFG::with_idents() {
             self.output.end_skippable()?;
         }
 
