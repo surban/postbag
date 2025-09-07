@@ -6,7 +6,7 @@ use serde::de::{
 };
 
 use crate::{
-    Cfg, FALSE, ID_COUNT, ID_LEN, ID_LEN_NAME, NONE, SOME, SPECIAL_LEN, TRUE, UNKNOWN_LEN,
+    Cfg, FALSE, NONE, SOME, SPECIAL_LEN, TRUE, UNKNOWN_LEN,
     cfg::DefaultCfg,
     de::skippable::SkipRead,
     error::{Error, Result},
@@ -116,16 +116,22 @@ impl<'de, R: Read, CFG: Cfg> Deserializer<'de, R, CFG> {
     fn read_identifier(&mut self) -> Result<String> {
         let v = self.try_take_varint_usize()?;
 
-        if v >= ID_LEN_NAME + ID_COUNT {
-            return Err(Error::BadIdentifier);
-        }
+        #[cfg(feature = "id")]
+        let len = {
+            if v >= crate::ID_LEN_NAME + crate::ID_COUNT {
+                return Err(Error::BadIdentifier);
+            }
 
-        if v >= ID_LEN_NAME {
-            let id = v - ID_LEN_NAME;
-            return Ok(format!("_{id}"));
-        }
+            if v >= crate::ID_LEN_NAME {
+                let id = v - crate::ID_LEN_NAME;
+                return Ok(format!("_{id}"));
+            }
 
-        let len = if v == ID_LEN { self.try_take_varint_usize()? } else { v };
+            if v == crate::ID_LEN { self.try_take_varint_usize()? } else { v }
+        };
+
+        #[cfg(not(feature = "id"))]
+        let len = v;
 
         let bytes = self.input.read(len)?;
         String::from_utf8(bytes).map_err(|_| Error::BadIdentifier)

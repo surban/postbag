@@ -13,6 +13,9 @@ license = "Apache-2.0"
 categories = ["encoding"]
 keywords = ["serde"]
 
+[features]
+id = []
+
 [dependencies]
 serde = "1.0.219"
 

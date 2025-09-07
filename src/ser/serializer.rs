@@ -3,7 +3,7 @@ use std::{io::Write, marker::PhantomData};
 use serde::{Serialize, ser};
 
 use crate::{
-    Cfg, FALSE, ID_COUNT, ID_LEN, ID_LEN_NAME, NONE, SOME, SPECIAL_LEN, TRUE, UNKNOWN_LEN,
+    Cfg, FALSE, NONE, SOME, SPECIAL_LEN, TRUE, UNKNOWN_LEN,
     cfg::DefaultCfg,
     error::{Error, Result},
     ser::skippable::SkipWrite,
@@ -61,21 +61,28 @@ impl<W: Write, CFG: Cfg> Serializer<W, CFG> {
     }
 
     fn write_identifier(&mut self, ident: &str) -> Result<()> {
+        #[cfg(feature = "id")]
         match ident.strip_prefix("_").and_then(|s| s.parse::<usize>().ok()) {
-            Some(id) if id < ID_COUNT => {
-                self.write_usize(ID_LEN_NAME + id)?;
+            Some(id) if id < crate::ID_COUNT => {
+                self.write_usize(crate::ID_LEN_NAME + id)?;
             }
             _ => {
                 let len = ident.len();
-                if len < ID_LEN {
+                if len < crate::ID_LEN {
                     self.write_usize(len)?;
                 } else {
-                    self.write_usize(ID_LEN)?;
+                    self.write_usize(crate::ID_LEN)?;
                     self.write_usize(len)?;
                 }
 
                 self.output.write(ident.as_bytes())?;
             }
+        }
+
+        #[cfg(not(feature = "id"))]
+        {
+            self.write_usize(ident.len())?;
+            self.output.write(ident.as_bytes())?;
         }
 
         Ok(())

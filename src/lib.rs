@@ -16,8 +16,11 @@ const SOME: u8 = 1;
 const SPECIAL_LEN: usize = 125;
 const UNKNOWN_LEN: usize = 0;
 
+#[cfg(feature = "id")]
 const ID_LEN: usize = 64;
+#[cfg(feature = "id")]
 const ID_LEN_NAME: usize = ID_LEN + 1;
+#[cfg(feature = "id")]
 const ID_COUNT: usize = 60;
 
 pub use cfg::{Cfg, Config, DefaultCfg};
