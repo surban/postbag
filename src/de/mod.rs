@@ -1,7 +1,7 @@
 use deserializer::Deserializer;
 use serde::de::DeserializeOwned;
 
-use crate::{Cfg, error::Result};
+use crate::{cfg::Cfg, error::Result};
 
 pub(crate) mod deserializer;
 mod skippable;

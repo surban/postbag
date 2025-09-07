@@ -1,28 +1,26 @@
-/// Configuration.
-pub trait Cfg: Copy + Clone {
+//! Configuration of Postbag serialization data format.
+
+use std::fmt;
+
+/// Configuration trait.
+pub trait Cfg {
     /// Whether struct field identifiers and enum variant identifiers
     /// are serialized.
     fn with_idents() -> bool;
 }
 
-/// Configuration.
-#[derive(Debug, Clone, Copy)]
-pub struct Config<const WITH_IDENTS: bool>;
+/// Static (compile-time) configuration.
+#[derive(Clone, Copy)]
+pub struct StaticCfg<const WITH_IDENTS: bool>;
 
-impl<const WITH_IDENTIFIERS: bool> Cfg for Config<WITH_IDENTIFIERS> {
-    fn with_idents() -> bool {
-        WITH_IDENTIFIERS
+impl<const WITH_IDENTS: bool> fmt::Debug for StaticCfg<WITH_IDENTS> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("StaticCfg").field("with_idents", &WITH_IDENTS).finish()
     }
 }
 
-/// Serialize with identifiers.
-///
-/// Struct field identifiers and enum variant identifiers are serialized
-/// as strings.
-pub type Full = Config<true>;
-
-/// Serialize without identifiers.
-///
-/// Struct field identifiers are not serialized.
-/// Enum variants are serialized using their index.
-pub type Slim = Config<false>;
+impl<const WITH_IDENTS: bool> Cfg for StaticCfg<WITH_IDENTS> {
+    fn with_idents() -> bool {
+        WITH_IDENTS
+    }
+}

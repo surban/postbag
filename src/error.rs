@@ -1,24 +1,24 @@
 use std::fmt::{Display, Formatter};
 
-/// Error of serializaton and deserialization operations.
+/// Error of Postbag operations.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum Error {
-    /// deserialize_any is unsupported
+    /// [`deserialize_any`](serde::de::Deserializer::deserialize_any) is unsupported
     DeserializeAnyUnsupported,
     /// End of block
     EndOfBlock,
     /// Found a varint that didn't terminate
     BadVarint,
-    /// Found a bool that wasn't 0 or 1
+    /// Found an invalid bool
     BadBool,
-    /// Found an invalid unicode char
+    /// Found an invalid UTF-8 char
     BadChar,
-    /// Tried to parse invalid utf-8
+    /// Found an invalid UTF-8 string
     BadString,
-    /// Found an Option discriminant that wasn't 0 or 1
+    /// Found an invalid Option discriminant
     BadOption,
-    /// Found an enum discriminant that was > `u32::MAX`
+    /// Found an invalid enum discriminant
     BadEnum,
     /// Bad length of a sequence or map
     BadLen,
@@ -42,7 +42,7 @@ impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         use Error::*;
         match self {
-            DeserializeAnyUnsupported => write!(f, "deserialize_any is unsupproted"),
+            DeserializeAnyUnsupported => write!(f, "deserialize_any is unsupported"),
             EndOfBlock => write!(f, "end of block"),
             BadVarint => write!(f, "invalid integer"),
             BadBool => write!(f, "invalid bool"),
@@ -79,5 +79,5 @@ impl serde::de::Error for Error {
 
 impl std::error::Error for Error {}
 
-/// Result type of serialization and deserialization operations.
+/// Result of Postbag operations.
 pub type Result<T> = std::result::Result<T, Error>;

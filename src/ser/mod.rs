@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::{Cfg, error::Result, ser::serializer::Serializer};
+use crate::{cfg::Cfg, error::Result, ser::serializer::Serializer};
 
 pub(crate) mod serializer;
 pub(crate) mod skippable;

@@ -6,15 +6,15 @@ use serde::de::{
 };
 
 use crate::{
-    Cfg, FALSE, ID_COUNT, ID_LEN, ID_LEN_NAME, NONE, SOME, SPECIAL_LEN, TRUE, UNKNOWN_LEN,
-    cfg::Full,
+    FALSE, ID_COUNT, ID_LEN, ID_LEN_NAME, NONE, SOME, SPECIAL_LEN, TRUE, UNKNOWN_LEN,
+    cfg::Cfg,
     de::skippable::SkipRead,
     error::{Error, Result},
     varint::{max_of_last_byte, varint_max},
 };
 
 /// Deserializer.
-pub struct Deserializer<'de, R, CFG = Full> {
+pub struct Deserializer<'de, R, CFG> {
     input: SkipRead<R>,
     _de: PhantomData<&'de ()>,
     _cfg: PhantomData<CFG>,

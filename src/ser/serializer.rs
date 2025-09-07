@@ -3,15 +3,15 @@ use std::{io::Write, marker::PhantomData};
 use serde::{Serialize, ser};
 
 use crate::{
-    Cfg, FALSE, ID_COUNT, ID_LEN, ID_LEN_NAME, NONE, SOME, SPECIAL_LEN, TRUE, UNKNOWN_LEN,
-    cfg::Full,
+    FALSE, ID_COUNT, ID_LEN, ID_LEN_NAME, NONE, SOME, SPECIAL_LEN, TRUE, UNKNOWN_LEN,
+    cfg::Cfg,
     error::{Error, Result},
     ser::skippable::SkipWrite,
     varint::*,
 };
 
 /// Serializer
-pub struct Serializer<W, CFG = Full> {
+pub struct Serializer<W, CFG> {
     output: SkipWrite<W>,
     _cfg: PhantomData<CFG>,
 }

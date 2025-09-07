@@ -6,7 +6,7 @@ use std::{
     marker::PhantomData,
 };
 
-use postbag::{Cfg, Config, Error, Slim, deserialize, serialize};
+use postbag::{Error, Full, Slim, cfg::Cfg, deserialize, serialize};
 
 /// Performs serialization followed by deserialization and checks that the
 /// deserialized value is unchanged.
@@ -34,10 +34,10 @@ where
     T: Serialize + DeserializeOwned + Debug + Eq,
 {
     println!("Testing with field names");
-    loopback_with_cfg::<_, Config<true>>(&value);
+    loopback_with_cfg::<_, Full>(&value);
 
     println!("Testing without field names");
-    loopback_with_cfg::<_, Config<false>>(&value);
+    loopback_with_cfg::<_, Slim>(&value);
 }
 
 // =============================================================================

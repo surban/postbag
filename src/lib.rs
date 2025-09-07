@@ -3,7 +3,7 @@
 
 //! Postbag is a [serde] codec.
 
-mod cfg;
+pub mod cfg;
 mod de;
 mod error;
 pub mod fixint;
@@ -23,7 +23,18 @@ const ID_LEN: usize = 64;
 const ID_LEN_NAME: usize = ID_LEN + 1;
 const ID_COUNT: usize = 60;
 
-pub use cfg::{Cfg, Config, Full, Slim};
 pub use de::deserialize;
 pub use error::{Error, Result};
 pub use ser::serialize;
+
+/// Serialize with identifiers.
+///
+/// Struct field identifiers and enum variant identifiers are serialized
+/// as strings.
+pub type Full = cfg::StaticCfg<true>;
+
+/// Serialize without identifiers.
+///
+/// Struct field identifiers are not serialized.
+/// Enum variants are serialized using their index.
+pub type Slim = cfg::StaticCfg<false>;

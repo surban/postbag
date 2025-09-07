@@ -1,10 +1,7 @@
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 
-use postbag::{Cfg, Config, deserialize, serialize};
-
-type WithIdents = Config<true>;
-type WithoutIdents = Config<false>;
+use postbag::{Full, Slim, cfg::Cfg, deserialize, serialize};
 
 /// Transform from one type to another via serialization followed by deserialization.
 #[track_caller]
@@ -48,7 +45,7 @@ fn changed_struct_fields() {
 
     let a = A { f1: 1, f2: 2, f3: 3 };
 
-    let b: B = transform::<_, _, WithIdents>(&a);
+    let b: B = transform::<_, _, Full>(&a);
 
     assert_eq!(b.f2, a.f2);
     assert_eq!(b.f4, f4_default());
@@ -78,13 +75,13 @@ fn added_struct_fields() {
 
     let a = A { f1: 1, f2: 2, f3: 3 };
 
-    let b: B = transform::<_, _, WithIdents>(&a);
+    let b: B = transform::<_, _, Full>(&a);
     assert_eq!(b.f1, a.f1);
     assert_eq!(b.f2, a.f2);
     assert_eq!(b.f3, a.f3);
     assert_eq!(b.f4, f4_default());
 
-    let b: B = transform::<_, _, WithoutIdents>(&a);
+    let b: B = transform::<_, _, Slim>(&a);
     assert_eq!(b.f1, a.f1);
     assert_eq!(b.f2, a.f2);
     assert_eq!(b.f3, a.f3);
@@ -118,7 +115,7 @@ fn changed_struct_variant_fields() {
     let a_f2 = 2;
     let a = A::V2 { f1: 1, f2: a_f2, f3: 3 };
 
-    let b: B = transform::<_, _, WithIdents>(&a);
+    let b: B = transform::<_, _, Full>(&a);
 
     let B::V2 { f2, f4 } = b else { panic!("wrong variant") };
     assert_eq!(f2, a_f2);
@@ -155,14 +152,14 @@ fn added_struct_variant_fields() {
     let a_f3 = 3;
     let a = A::V2 { f1: a_f1, f2: a_f2, f3: a_f3 };
 
-    let b: B = transform::<_, _, WithIdents>(&a);
+    let b: B = transform::<_, _, Full>(&a);
     let B::V2 { f1, f2, f3, f4 } = b else { panic!("wrong variant") };
     assert_eq!(f1, a_f1);
     assert_eq!(f2, a_f2);
     assert_eq!(f3, a_f3);
     assert_eq!(f4, f4_default());
 
-    let b: B = transform::<_, _, WithoutIdents>(&a);
+    let b: B = transform::<_, _, Slim>(&a);
     let B::V2 { f1, f2, f3, f4 } = b else { panic!("wrong variant") };
     assert_eq!(f1, a_f1);
     assert_eq!(f2, a_f2);
@@ -199,12 +196,12 @@ fn removed_struct_fields_nested_struct() {
 
     let xa = XA { a: A { f1: 1, f2: 2, f3: 3 }, x: 99 };
 
-    let xb: XB = transform::<_, _, WithIdents>(&xa);
+    let xb: XB = transform::<_, _, Full>(&xa);
     assert_eq!(xb.a.f1, xa.a.f1);
     assert_eq!(xb.a.f2, xa.a.f2);
     assert_eq!(xb.x, xa.x);
 
-    let xb: XB = transform::<_, _, WithoutIdents>(&xa);
+    let xb: XB = transform::<_, _, Slim>(&xa);
     assert_eq!(xb.a.f1, xa.a.f1);
     assert_eq!(xb.a.f2, xa.a.f2);
     assert_eq!(xb.x, xa.x);
@@ -227,12 +224,12 @@ fn removed_struct_fields_nested_tuple() {
 
     let xa = (A { f1: 1, f2: 2, f3: 3 }, 99);
 
-    let xb: (B, u32) = transform::<_, _, WithIdents>(&xa);
+    let xb: (B, u32) = transform::<_, _, Full>(&xa);
     assert_eq!(xb.0.f1, xa.0.f1);
     assert_eq!(xb.0.f2, xa.0.f2);
     assert_eq!(xb.1, xa.1);
 
-    let xb: (B, u32) = transform::<_, _, WithoutIdents>(&xa);
+    let xb: (B, u32) = transform::<_, _, Slim>(&xa);
     assert_eq!(xb.0.f1, xa.0.f1);
     assert_eq!(xb.0.f2, xa.0.f2);
     assert_eq!(xb.1, xa.1);
