@@ -234,3 +234,217 @@ fn removed_struct_fields_nested_tuple() {
     assert_eq!(xb.0.f2, xa.0.f2);
     assert_eq!(xb.1, xa.1);
 }
+
+#[test]
+fn added_enum_variants_slim_encoding() {
+    // Original enum with 3 variants
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    enum Original {
+        Variant1,
+        Variant2(u32),
+        Variant3 { value: String },
+    }
+
+    // Extended enum with additional variants at the end
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    enum Extended {
+        Variant1,
+        Variant2(u32),
+        Variant3 {
+            value: String,
+        },
+        Variant4,
+        Variant5(bool),
+        #[serde(other)]
+        Unknown,
+    }
+
+    // Even more extended enum for backward compatibility testing
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    enum MoreExtended {
+        Variant1,
+        Variant2(u32),
+        Variant3 {
+            value: String,
+        },
+        Variant4,
+        Variant5(bool),
+        Variant6 {
+            x: i32,
+            y: i32,
+        },
+        #[serde(other)]
+        Unknown,
+    }
+
+    // Test forward compatibility: Original -> Extended
+    let original_v1 = Original::Variant1;
+    let extended_v1: Extended = transform::<_, _, Slim>(&original_v1);
+    assert_eq!(extended_v1, Extended::Variant1);
+
+    let original_v2 = Original::Variant2(42);
+    let extended_v2: Extended = transform::<_, _, Slim>(&original_v2);
+    assert_eq!(extended_v2, Extended::Variant2(42));
+
+    let original_v3 = Original::Variant3 { value: "test".to_string() };
+    let extended_v3: Extended = transform::<_, _, Slim>(&original_v3);
+    assert_eq!(extended_v3, Extended::Variant3 { value: "test".to_string() });
+
+    // Test backward compatibility: Extended -> Original (with #[serde(other)])
+    let extended_v4 = Extended::Variant4;
+    let mut serialized = Vec::new();
+    serialize::<Slim, _, _>(&extended_v4, &mut serialized).expect("serialization failed");
+
+    // This should deserialize to Unknown variant when using Original enum with #[serde(other)]
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    enum OriginalWithOther {
+        Variant1,
+        Variant2(u32),
+        Variant3 {
+            value: String,
+        },
+        #[serde(other)]
+        Unknown,
+    }
+
+    let deserialized: OriginalWithOther =
+        deserialize::<Slim, _, _>(serialized.as_slice()).expect("deserialization failed");
+    assert_eq!(deserialized, OriginalWithOther::Unknown);
+
+    let extended_v5 = Extended::Variant5(true);
+    let mut serialized = Vec::new();
+    serialize::<Slim, _, _>(&extended_v5, &mut serialized).expect("serialization failed");
+    let deserialized: OriginalWithOther =
+        deserialize::<Slim, _, _>(serialized.as_slice()).expect("deserialization failed");
+    assert_eq!(deserialized, OriginalWithOther::Unknown);
+
+    // Test compatibility with even more extended version
+    let more_extended_v6 = MoreExtended::Variant6 { x: 10, y: 20 };
+    let mut serialized = Vec::new();
+    serialize::<Slim, _, _>(&more_extended_v6, &mut serialized).expect("serialization failed");
+
+    // Should deserialize to Unknown in Extended enum
+    let deserialized: Extended =
+        deserialize::<Slim, _, _>(serialized.as_slice()).expect("deserialization failed");
+    assert_eq!(deserialized, Extended::Unknown);
+
+    // Should also deserialize to Unknown in OriginalWithOther enum
+    let deserialized: OriginalWithOther =
+        deserialize::<Slim, _, _>(serialized.as_slice()).expect("deserialization failed");
+    assert_eq!(deserialized, OriginalWithOther::Unknown);
+
+    // Test that existing variants still work across all versions
+    let more_extended_v1 = MoreExtended::Variant1;
+    let extended_v1: Extended = transform::<_, _, Slim>(&more_extended_v1);
+    assert_eq!(extended_v1, Extended::Variant1);
+
+    let original_v1: OriginalWithOther = transform::<_, _, Slim>(&more_extended_v1);
+    assert_eq!(original_v1, OriginalWithOther::Variant1);
+}
+
+#[test]
+fn added_enum_variants_full_encoding() {
+    // Original enum with 3 variants
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    enum Original {
+        Variant1,
+        Variant2(u32),
+        Variant3 { value: String },
+    }
+
+    // Extended enum with additional variants at the end
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    enum Extended {
+        Variant1,
+        Variant2(u32),
+        Variant3 {
+            value: String,
+        },
+        Variant4,
+        Variant5(bool),
+        #[serde(other)]
+        Unknown,
+    }
+
+    // Even more extended enum for backward compatibility testing
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    enum MoreExtended {
+        Variant1,
+        Variant2(u32),
+        Variant3 {
+            value: String,
+        },
+        Variant4,
+        Variant5(bool),
+        Variant6 {
+            x: i32,
+            y: i32,
+        },
+        #[serde(other)]
+        Unknown,
+    }
+
+    // Test forward compatibility: Original -> Extended
+    let original_v1 = Original::Variant1;
+    let extended_v1: Extended = transform::<_, _, Full>(&original_v1);
+    assert_eq!(extended_v1, Extended::Variant1);
+
+    let original_v2 = Original::Variant2(42);
+    let extended_v2: Extended = transform::<_, _, Full>(&original_v2);
+    assert_eq!(extended_v2, Extended::Variant2(42));
+
+    let original_v3 = Original::Variant3 { value: "test".to_string() };
+    let extended_v3: Extended = transform::<_, _, Full>(&original_v3);
+    assert_eq!(extended_v3, Extended::Variant3 { value: "test".to_string() });
+
+    // Test backward compatibility: Extended -> Original (with #[serde(other)])
+    let extended_v4 = Extended::Variant4;
+    let mut serialized = Vec::new();
+    serialize::<Full, _, _>(&extended_v4, &mut serialized).expect("serialization failed");
+
+    // This should deserialize to Unknown variant when using Original enum with #[serde(other)]
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    enum OriginalWithOther {
+        Variant1,
+        Variant2(u32),
+        Variant3 {
+            value: String,
+        },
+        #[serde(other)]
+        Unknown,
+    }
+
+    let deserialized: OriginalWithOther =
+        deserialize::<Full, _, _>(serialized.as_slice()).expect("deserialization failed");
+    assert_eq!(deserialized, OriginalWithOther::Unknown);
+
+    let extended_v5 = Extended::Variant5(true);
+    let mut serialized = Vec::new();
+    serialize::<Full, _, _>(&extended_v5, &mut serialized).expect("serialization failed");
+    let deserialized: OriginalWithOther =
+        deserialize::<Full, _, _>(serialized.as_slice()).expect("deserialization failed");
+    assert_eq!(deserialized, OriginalWithOther::Unknown);
+
+    // Test compatibility with even more extended version
+    let more_extended_v6 = MoreExtended::Variant6 { x: 10, y: 20 };
+    let mut serialized = Vec::new();
+    serialize::<Full, _, _>(&more_extended_v6, &mut serialized).expect("serialization failed");
+
+    // Should deserialize to Unknown in Extended enum
+    let deserialized: Extended =
+        deserialize::<Full, _, _>(serialized.as_slice()).expect("deserialization failed");
+    assert_eq!(deserialized, Extended::Unknown);
+
+    // Should also deserialize to Unknown in OriginalWithOther enum
+    let deserialized: OriginalWithOther =
+        deserialize::<Full, _, _>(serialized.as_slice()).expect("deserialization failed");
+    assert_eq!(deserialized, OriginalWithOther::Unknown);
+
+    // Test that existing variants still work across all versions
+    let more_extended_v1 = MoreExtended::Variant1;
+    let extended_v1: Extended = transform::<_, _, Full>(&more_extended_v1);
+    assert_eq!(extended_v1, Extended::Variant1);
+
+    let original_v1: OriginalWithOther = transform::<_, _, Full>(&more_extended_v1);
+    assert_eq!(original_v1, OriginalWithOther::Variant1);
+}
