@@ -15,7 +15,7 @@ where
     CFG: Cfg,
 {
     let mut serialized = Vec::new();
-    serialize::<CFG, _, _>(&value, &mut serialized).expect("serialization failed");
+    serialize::<CFG, _, _>(&mut serialized, &value).expect("serialization failed");
     println!("{serialized:02x?}");
     dbg!(serialized.len());
 
@@ -296,7 +296,7 @@ fn added_enum_variants_slim_encoding() {
     // Test backward compatibility: Extended -> Original (with #[serde(other)])
     let extended_v4 = Extended::Variant4;
     let mut serialized = Vec::new();
-    serialize::<Slim, _, _>(&extended_v4, &mut serialized).expect("serialization failed");
+    serialize::<Slim, _, _>(&mut serialized, &extended_v4).expect("serialization failed");
 
     // This should deserialize to Unknown variant when using Original enum with #[serde(other)]
     #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -316,7 +316,7 @@ fn added_enum_variants_slim_encoding() {
 
     let extended_v5 = Extended::Variant5(true);
     let mut serialized = Vec::new();
-    serialize::<Slim, _, _>(&extended_v5, &mut serialized).expect("serialization failed");
+    serialize::<Slim, _, _>(&mut serialized, &extended_v5).expect("serialization failed");
     let deserialized: OriginalWithOther =
         deserialize::<Slim, _, _>(serialized.as_slice()).expect("deserialization failed");
     assert_eq!(deserialized, OriginalWithOther::Unknown);
@@ -324,7 +324,7 @@ fn added_enum_variants_slim_encoding() {
     // Test compatibility with even more extended version
     let more_extended_v6 = MoreExtended::Variant6 { x: 10, y: 20 };
     let mut serialized = Vec::new();
-    serialize::<Slim, _, _>(&more_extended_v6, &mut serialized).expect("serialization failed");
+    serialize::<Slim, _, _>(&mut serialized, &more_extended_v6).expect("serialization failed");
 
     // Should deserialize to Unknown in Extended enum
     let deserialized: Extended =
@@ -403,7 +403,7 @@ fn added_enum_variants_full_encoding() {
     // Test backward compatibility: Extended -> Original (with #[serde(other)])
     let extended_v4 = Extended::Variant4;
     let mut serialized = Vec::new();
-    serialize::<Full, _, _>(&extended_v4, &mut serialized).expect("serialization failed");
+    serialize::<Full, _, _>(&mut serialized, &extended_v4).expect("serialization failed");
 
     // This should deserialize to Unknown variant when using Original enum with #[serde(other)]
     #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -423,7 +423,7 @@ fn added_enum_variants_full_encoding() {
 
     let extended_v5 = Extended::Variant5(true);
     let mut serialized = Vec::new();
-    serialize::<Full, _, _>(&extended_v5, &mut serialized).expect("serialization failed");
+    serialize::<Full, _, _>(&mut serialized, &extended_v5).expect("serialization failed");
     let deserialized: OriginalWithOther =
         deserialize::<Full, _, _>(serialized.as_slice()).expect("deserialization failed");
     assert_eq!(deserialized, OriginalWithOther::Unknown);
@@ -431,7 +431,7 @@ fn added_enum_variants_full_encoding() {
     // Test compatibility with even more extended version
     let more_extended_v6 = MoreExtended::Variant6 { x: 10, y: 20 };
     let mut serialized = Vec::new();
-    serialize::<Full, _, _>(&more_extended_v6, &mut serialized).expect("serialization failed");
+    serialize::<Full, _, _>(&mut serialized, &more_extended_v6).expect("serialization failed");
 
     // Should deserialize to Unknown in Extended enum
     let deserialized: Extended =

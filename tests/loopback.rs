@@ -21,7 +21,7 @@ where
     CFG: Cfg,
 {
     let mut serialized = Vec::new();
-    serialize::<CFG, _, _>(value, &mut serialized).expect("serialization failed");
+    serialize::<CFG, _, _>(&mut serialized, value).expect("serialization failed");
     println!("{serialized:02x?}");
     dbg!(serialized.len());
 
@@ -834,7 +834,7 @@ fn error_handling_vec_bounds() {
     // This won't actually prove anything since tests will likely always be
     // run on devices with larger amounts of memory, but it can't hurt.
     assert!(matches!(
-        deserialize::<Slim, Vec<u8>, _>([(1 << 7) | 8, 255, 255, 255, 0, 0, 0, 0, 0].as_slice()),
+        deserialize::<Slim, _, Vec<u8>>([(1 << 7) | 8, 255, 255, 255, 0, 0, 0, 0, 0].as_slice()),
         Err(Error::Io(io)) if io.kind() == ErrorKind::UnexpectedEof
     ));
 }
@@ -843,7 +843,7 @@ fn error_handling_vec_bounds() {
 fn varint_boundary_tests() {
     loopback(u32::MAX);
 
-    let deser = deserialize::<Slim, u32, _>([0xFF, 0xFF, 0xFF, 0xFF, 0x1F].as_slice());
+    let deser = deserialize::<Slim, _, u32>([0xFF, 0xFF, 0xFF, 0xFF, 0x1F].as_slice());
     assert!(matches!(deser, Err(Error::BadVarint)));
 }
 

@@ -25,10 +25,10 @@ fn main() {
 
     // Serialize both versions
     let mut regular_buffer = Vec::new();
-    serialize::<Full, _, _>(&data_regular, &mut regular_buffer).unwrap();
+    serialize::<Full, _, _>(&mut regular_buffer, &data_regular).unwrap();
 
     let mut compact_buffer = Vec::new();
-    serialize::<Full, _, _>(&data_compact, &mut compact_buffer).unwrap();
+    serialize::<Full, _, _>(&mut compact_buffer, &data_compact).unwrap();
 
     println!("Regular field names: {} bytes", regular_buffer.len());
     println!("Compact field names: {} bytes", compact_buffer.len());
