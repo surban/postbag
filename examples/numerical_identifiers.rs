@@ -1,4 +1,4 @@
-use postbag::{Full, deserialize, serialize};
+use postbag::{cfg::Full, deserialize, serialize};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]

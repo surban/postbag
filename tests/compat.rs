@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 
-use postbag::{Full, Slim, cfg::Cfg, deserialize, serialize};
+use postbag::{
+    cfg::{Cfg, Full, Slim},
+    deserialize, serialize,
+};
 
 /// Transform from one type to another via serialization followed by deserialization.
 #[track_caller]

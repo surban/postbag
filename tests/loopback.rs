@@ -6,7 +6,11 @@ use std::{
     marker::PhantomData,
 };
 
-use postbag::{Error, Full, Slim, cfg::Cfg, deserialize, serialize};
+use postbag::{
+    Error,
+    cfg::{Cfg, Full, Slim},
+    deserialize, serialize,
+};
 
 /// Performs serialization followed by deserialization and checks that the
 /// deserialized value is unchanged.

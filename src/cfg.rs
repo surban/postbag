@@ -24,3 +24,15 @@ impl<const WITH_IDENTS: bool> Cfg for StaticCfg<WITH_IDENTS> {
         WITH_IDENTS
     }
 }
+
+/// Serialize with identifiers.
+///
+/// Struct field identifiers and enum variant identifiers are serialized
+/// as strings or using numerical identifier encoding.
+pub type Full = StaticCfg<true>;
+
+/// Serialize without identifiers.
+///
+/// Struct field identifiers are not serialized.
+/// Enum variants are serialized using their index.
+pub type Slim = StaticCfg<false>;

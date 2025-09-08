@@ -17,7 +17,7 @@ Postbag is a high-performance binary [serde] codec for Rust that provides effici
 
 ```rust
 use serde::{Serialize, Deserialize};
-use postbag::{serialize, deserialize, Full};
+use postbag::{serialize_full, deserialize_full};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct Person {
@@ -30,12 +30,12 @@ let original = Person {
     age: 30,
 };
 
-// Serialize to a byte vector
+// Serialize to a byte vector using Full configuration
 let mut buffer = Vec::new();
-serialize::<Full, _, _>(&original, &mut buffer).unwrap();
+serialize_full(&original, &mut buffer).unwrap();
 
 // Deserialize back to the original type
-let deserialized: Person = deserialize::<Full, _, _>(buffer.as_slice()).unwrap();
+let deserialized: Person = deserialize_full(buffer.as_slice()).unwrap();
 assert_eq!(original, deserialized);
 ```
 
