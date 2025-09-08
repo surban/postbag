@@ -1,6 +1,6 @@
 [package]
 name = "postbag"
-version = "0.2.0"
+version = "0.3.0"
 authors = [
     "Sebastian Urban <surban@surban.net>",
     "James Munns <james@onevariable.com>",
