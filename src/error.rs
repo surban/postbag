@@ -38,6 +38,24 @@ impl From<std::io::Error> for Error {
     }
 }
 
+impl From<Error> for std::io::Error {
+    fn from(err: Error) -> Self {
+        use std::io::ErrorKind;
+
+        if let Error::Io(err) = err {
+            return err;
+        }
+
+        let kind = match &err {
+            Error::DeserializeAnyUnsupported => ErrorKind::Unsupported,
+            Error::EndOfBlock => ErrorKind::UnexpectedEof,
+            _ => ErrorKind::InvalidData,
+        };
+
+        std::io::Error::new(kind, err)
+    }
+}
+
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         use Error::*;
