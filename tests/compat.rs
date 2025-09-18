@@ -451,3 +451,122 @@ fn added_enum_variants_full_encoding() {
     let original_v1: OriginalWithOther = transform::<_, _, Full>(&more_extended_v1);
     assert_eq!(original_v1, OriginalWithOther::Variant1);
 }
+
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
+struct AccountCredentials {
+    id: String,
+    #[serde(with = "pkcs8_serde")]
+    key_pkcs8: Vec<u8>,
+    directory: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    urls: Option<DirectoryUrls>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct DirectoryUrls {
+    new_nonce: String,
+    new_account: String,
+    new_order: String,
+    new_authz: Option<String>,
+    revoke_cert: Option<String>,
+    key_change: Option<String>,
+}
+
+mod pkcs8_serde {
+    use std::fmt;
+
+    use base64::prelude::{BASE64_URL_SAFE_NO_PAD, Engine};
+    use serde::{Deserializer, Serializer, de};
+
+    pub fn serialize<S>(key_pkcs8: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let encoded = BASE64_URL_SAFE_NO_PAD.encode(key_pkcs8.as_ref());
+        serializer.serialize_str(&encoded)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<u8>, D::Error> {
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = Vec<u8>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a base64-encoded PKCS#8 private key")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Vec<u8>, E>
+            where
+                E: de::Error,
+            {
+                BASE64_URL_SAFE_NO_PAD.decode(v).map_err(de::Error::custom)
+            }
+        }
+
+        deserializer.deserialize_str(Visitor)
+    }
+}
+
+#[test]
+fn account_credentials_full_with_urls() {
+    let test_credentials = AccountCredentials {
+        id: "test-account-123".to_string(),
+        key_pkcs8: vec![0x30, 0x82, 0x01, 0x22, 0x30, 0x0D], // Mock PKCS#8 DER data
+        directory: Some("https://acme-v02.api.letsencrypt.org/directory".to_string()),
+        urls: Some(DirectoryUrls {
+            new_nonce: "https://acme-v02.api.letsencrypt.org/acme/new-nonce".to_string(),
+            new_account: "https://acme-v02.api.letsencrypt.org/acme/new-acct".to_string(),
+            new_order: "https://acme-v02.api.letsencrypt.org/acme/new-order".to_string(),
+            new_authz: Some("https://acme-v02.api.letsencrypt.org/acme/new-authz".to_string()),
+            revoke_cert: Some("https://acme-v02.api.letsencrypt.org/acme/revoke-cert".to_string()),
+            key_change: Some("https://acme-v02.api.letsencrypt.org/acme/key-change".to_string()),
+        }),
+    };
+
+    let _: AccountCredentials = transform::<_, _, Full>(&test_credentials);
+}
+
+#[test]
+fn account_credentials_slim_with_urls() {
+    let test_credentials = AccountCredentials {
+        id: "test-account-456".to_string(),
+        key_pkcs8: vec![0x30, 0x82, 0x01, 0x22, 0x30, 0x0D], // Mock PKCS#8 DER data
+        directory: Some("https://acme-v02.api.letsencrypt.org/directory".to_string()),
+        urls: Some(DirectoryUrls {
+            new_nonce: "https://acme-v02.api.letsencrypt.org/acme/new-nonce".to_string(),
+            new_account: "https://acme-v02.api.letsencrypt.org/acme/new-acct".to_string(),
+            new_order: "https://acme-v02.api.letsencrypt.org/acme/new-order".to_string(),
+            new_authz: Some("https://acme-v02.api.letsencrypt.org/acme/new-authz".to_string()),
+            revoke_cert: Some("https://acme-v02.api.letsencrypt.org/acme/revoke-cert".to_string()),
+            key_change: Some("https://acme-v02.api.letsencrypt.org/acme/key-change".to_string()),
+        }),
+    };
+
+    let _: AccountCredentials = transform::<_, _, Slim>(&test_credentials);
+}
+
+#[test]
+fn account_credentials_full_without_urls() {
+    let test_credentials = AccountCredentials {
+        id: "test-account-789".to_string(),
+        key_pkcs8: vec![0x30, 0x82, 0x01, 0x22, 0x30, 0x0D], // Mock PKCS#8 DER data
+        directory: Some("https://acme-v02.api.letsencrypt.org/directory".to_string()),
+        urls: None, // No URLs
+    };
+
+    let _: AccountCredentials = transform::<_, _, Full>(&test_credentials);
+}
+
+#[test]
+fn account_credentials_slim_without_urls() {
+    let test_credentials = AccountCredentials {
+        id: "test-account-101".to_string(),
+        key_pkcs8: vec![0x30, 0x82, 0x01, 0x22, 0x30, 0x0D], // Mock PKCS#8 DER data
+        directory: Some("https://acme-v02.api.letsencrypt.org/directory".to_string()),
+        urls: None, // No URLs - this will cause skip_serializing_if to omit the field
+    };
+
+    let _: AccountCredentials = transform::<_, _, Slim>(&test_credentials);
+}

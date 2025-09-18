@@ -18,3 +18,4 @@ serde = "1.0.219"
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
+base64 = "0.22"
