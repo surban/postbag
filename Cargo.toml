@@ -14,8 +14,11 @@ categories = ["encoding"]
 keywords = ["serde"]
 
 [dependencies]
-serde = "1.0.219"
+serde = "1.0.228"
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
 base64 = "0.22"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(postbag_fast_compile)'] }

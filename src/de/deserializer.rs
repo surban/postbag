@@ -1,4 +1,4 @@
-use std::{io::Read, marker::PhantomData};
+use std::{collections::HashMap, io::Read, marker::PhantomData};
 
 use serde::de::{
     self, DeserializeSeed, IntoDeserializer, Visitor,
@@ -224,6 +224,77 @@ impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::MapAccess<'b> for StructFieldAcce
 
     fn size_hint(&self) -> Option<usize> {
         Some(self.len)
+    }
+}
+
+/// SeqAccess that provides pre-buffered field data in the expected order.
+///
+/// This allows using `visit_seq` instead of `visit_map` for struct
+/// deserialization in Full mode, which produces significantly less
+/// monomorphized code at the cost of buffering all field data in memory.
+///
+/// Activate with `RUSTFLAGS="--cfg postbag_fast_compile"`.
+struct BufferedFieldSeqAccess<'de, CFG> {
+    field_data: Vec<Option<Vec<u8>>>,
+    index: usize,
+    _phantom: PhantomData<(&'de (), CFG)>,
+}
+
+impl<'de, CFG: Cfg> BufferedFieldSeqAccess<'de, CFG> {
+    /// Reads all wire fields from the deserializer and reorders them to
+    /// match the expected field declaration order. Unknown fields are
+    /// silently dropped (forward compatibility).
+    ///
+    /// This constructor is deliberately NOT generic over any Visitor type
+    /// so that it is monomorphized only once per (R, CFG) pair, avoiding
+    /// code duplication across the many `deserialize_struct` instantiations.
+    #[inline(never)]
+    fn new<R: Read>(
+        deser: &mut Deserializer<'_, R, CFG>, fields: &'static [&'static str], len: usize,
+    ) -> Result<Self> {
+        // Build index: field name -> position in expected order.
+        let field_index: HashMap<&'static str, usize> =
+            fields.iter().enumerate().map(|(i, &name)| (name, i)).collect();
+
+        // Read wire fields and place directly into the right slot.
+        let mut field_data: Vec<Option<Vec<u8>>> = vec![None; fields.len()];
+        for _ in 0..len {
+            let ident = deser.read_identifier()?;
+            let raw = deser.input.read_skippable_block()?;
+            if let Some(&idx) = field_index.get(ident.as_str()) {
+                field_data[idx] = Some(raw);
+            }
+            // Unknown fields (forward compat) are silently dropped.
+        }
+
+        Ok(Self { field_data, index: 0, _phantom: PhantomData })
+    }
+}
+
+impl<'de, CFG: Cfg> serde::de::SeqAccess<'de> for BufferedFieldSeqAccess<'de, CFG> {
+    type Error = Error;
+
+    #[inline(never)]
+    fn next_element_seed<V: DeserializeSeed<'de>>(&mut self, seed: V) -> Result<Option<V::Value>> {
+        if self.index >= self.field_data.len() {
+            return Ok(None);
+        }
+
+        let idx = self.index;
+        self.index += 1;
+
+        match self.field_data[idx].take() {
+            Some(raw) => {
+                let mut deser = Deserializer::<&[u8], CFG>::new(raw.as_slice());
+                let value = DeserializeSeed::deserialize(seed, &mut deser)?;
+                Ok(Some(value))
+            }
+            None => Ok(None),
+        }
+    }
+
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.field_data.len() - self.index)
     }
 }
 
@@ -528,7 +599,7 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
     }
 
     fn deserialize_struct<V>(
-        self, _name: &'static str, _fields: &'static [&'static str], visitor: V,
+        self, _name: &'static str, fields: &'static [&'static str], visitor: V,
     ) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -536,7 +607,17 @@ impl<'de, R: Read, CFG: Cfg> de::Deserializer<'de> for &mut Deserializer<'de, R,
         let len = self.read_varint_usize()?;
 
         if CFG::with_idents() {
-            visitor.visit_map(StructFieldAccess { deserializer: self, len })
+            if cfg!(postbag_fast_compile) {
+                // Buffered path: eagerly buffer all field data and reorder to match
+                // the expected field declaration order, then use `visit_seq`.
+                // Produces significantly less monomorphized code at the cost of
+                // buffering the entire struct payload in memory.
+                visitor.visit_seq(BufferedFieldSeqAccess::<CFG>::new(self, fields, len)?)
+            } else {
+                // Streaming path (default): read field identifiers and values
+                // directly from the wire using `visit_map` with skippable blocks.
+                visitor.visit_map(StructFieldAccess { deserializer: self, len })
+            }
         } else {
             self.input.start_skippable();
             let value = visitor.visit_seq(StructSeqAccess { deserializer: self, len })?;

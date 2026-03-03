@@ -50,6 +50,17 @@ impl<R: Read> SkipRead<R> {
     pub fn into_inner(self) -> R {
         self.0.into_inner()
     }
+
+    /// Opens a skippable block, reads all its contents, and closes it.
+    ///
+    /// Returns the raw bytes contained within the skippable block.
+    pub fn read_skippable_block(&mut self) -> Result<Vec<u8>> {
+        self.start_skippable();
+        let SkipStack::SkipBlock(sb) = &mut self.0 else { unreachable!() };
+        let data = sb.read_all()?;
+        self.end_skippable()?;
+        Ok(data)
+    }
 }
 
 enum SkipStack<R> {
@@ -161,5 +172,19 @@ impl<R: Read> SkipBlock<R> {
         }
 
         Ok(*self.inner)
+    }
+
+    fn read_all(&mut self) -> Result<Vec<u8>> {
+        let mut buf = Vec::new();
+        loop {
+            self.update_remaining()?;
+            if self.remaining == 0 {
+                break;
+            }
+            let chunk = self.inner.read(self.remaining)?;
+            buf.extend(chunk);
+            self.remaining = 0;
+        }
+        Ok(buf)
     }
 }
