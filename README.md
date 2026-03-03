@@ -89,6 +89,25 @@ The `Slim` configuration prioritizes performance and compact size:
 
 Postbag started as a fork of [postcard](https://github.com/jamesmunns/postcard) with the intent to add forward and backward compatibility to the serialized data format. While postcard provides excellent performance and compact encoding, postbag extends this foundation to support schema evolution and data format compatibility across different versions of your applications.
 
+## Fast Compile Mode
+
+Postbag supports an optional fast compile mode that reduces compilation time at the cost of buffering struct field data in memory during deserialization (instead of streaming it directly from the reader).
+
+Enable it by setting the `postbag_fast_compile` cfg flag:
+
+```sh
+RUSTFLAGS="--cfg postbag_fast_compile" cargo build
+```
+
+Or add it to your `.cargo/config.toml` for development:
+
+```toml
+[build]
+rustflags = ["--cfg", "postbag_fast_compile"]
+```
+
+This flag is intended for development use only. Production builds should use the default streaming mode.
+
 ## License
 
 Postbag is licensed under the [Apache 2.0 license].
