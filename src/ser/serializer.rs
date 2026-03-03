@@ -327,6 +327,7 @@ where
     type Ok = ();
     type Error = Error;
 
+    #[inline(never)]
     fn serialize_element<T>(&mut self, value: &T) -> Result<()>
     where
         T: ?Sized + Serialize,
@@ -351,6 +352,7 @@ where
     type Ok = ();
     type Error = Error;
 
+    #[inline(never)]
     fn serialize_element<T>(&mut self, value: &T) -> Result<()>
     where
         T: ?Sized + Serialize,
@@ -371,6 +373,7 @@ where
     type Ok = ();
     type Error = Error;
 
+    #[inline(never)]
     fn serialize_field<T>(&mut self, value: &T) -> Result<()>
     where
         T: ?Sized + Serialize,
@@ -391,6 +394,7 @@ where
     type Ok = ();
     type Error = Error;
 
+    #[inline(never)]
     fn serialize_field<T>(&mut self, value: &T) -> Result<()>
     where
         T: ?Sized + Serialize,
@@ -416,6 +420,7 @@ where
     type Ok = ();
     type Error = Error;
 
+    #[inline(never)]
     fn serialize_key<T>(&mut self, key: &T) -> Result<()>
     where
         T: ?Sized + Serialize,
@@ -423,6 +428,7 @@ where
         key.serialize(&mut *self.serializer)
     }
 
+    #[inline(never)]
     fn serialize_value<T>(&mut self, value: &T) -> Result<()>
     where
         T: ?Sized + Serialize,
@@ -447,6 +453,7 @@ where
     type Ok = ();
     type Error = Error;
 
+    #[inline(never)]
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<()>
     where
         T: ?Sized + Serialize,
@@ -482,6 +489,7 @@ where
     type Ok = ();
     type Error = Error;
 
+    #[inline(never)]
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<()>
     where
         T: ?Sized + Serialize,

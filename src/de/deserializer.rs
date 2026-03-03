@@ -140,6 +140,7 @@ struct SeqAccess<'a, 'b, R, CFG> {
 impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::SeqAccess<'b> for SeqAccess<'a, 'b, R, CFG> {
     type Error = Error;
 
+    #[inline(never)]
     fn next_element_seed<V: DeserializeSeed<'b>>(&mut self, seed: V) -> Result<Option<V::Value>> {
         match &mut self.len {
             Some(0) => Ok(None),
@@ -169,6 +170,7 @@ struct StructSeqAccess<'a, 'b, R, CFG> {
 impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::SeqAccess<'b> for StructSeqAccess<'a, 'b, R, CFG> {
     type Error = Error;
 
+    #[inline(never)]
     fn next_element_seed<V: DeserializeSeed<'b>>(&mut self, seed: V) -> Result<Option<V::Value>> {
         assert!(!CFG::with_idents());
 
@@ -186,6 +188,10 @@ impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::SeqAccess<'b> for StructSeqAccess
     }
 }
 
+/// Streaming MapAccess for struct fields in Full mode.
+///
+/// Reads field identifiers and values directly from the wire without
+/// buffering, using skippable blocks for forward compatibility.
 struct StructFieldAccess<'a, 'b, R, CFG> {
     deserializer: &'a mut Deserializer<'b, R, CFG>,
     len: usize,
@@ -194,6 +200,7 @@ struct StructFieldAccess<'a, 'b, R, CFG> {
 impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::MapAccess<'b> for StructFieldAccess<'a, 'b, R, CFG> {
     type Error = Error;
 
+    #[inline(never)]
     fn next_key_seed<K: DeserializeSeed<'b>>(&mut self, seed: K) -> Result<Option<K::Value>> {
         if self.len > 0 {
             self.len -= 1;
@@ -204,6 +211,7 @@ impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::MapAccess<'b> for StructFieldAcce
         }
     }
 
+    #[inline(never)]
     fn next_value_seed<V: DeserializeSeed<'b>>(&mut self, seed: V) -> Result<V::Value> {
         assert!(CFG::with_idents());
 
@@ -227,6 +235,7 @@ struct MapAccess<'a, 'b, R, CFG> {
 impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::MapAccess<'b> for MapAccess<'a, 'b, R, CFG> {
     type Error = Error;
 
+    #[inline(never)]
     fn next_key_seed<K: DeserializeSeed<'b>>(&mut self, seed: K) -> Result<Option<K::Value>> {
         match &mut self.len {
             Some(0) => Ok(None),
@@ -243,6 +252,7 @@ impl<'a, 'b: 'a, R: Read, CFG: Cfg> serde::de::MapAccess<'b> for MapAccess<'a, '
         }
     }
 
+    #[inline(never)]
     fn next_value_seed<V: DeserializeSeed<'b>>(&mut self, seed: V) -> Result<V::Value> {
         DeserializeSeed::deserialize(seed, &mut *self.deserializer)
     }
@@ -566,14 +576,17 @@ impl<'de, R: Read, CFG: Cfg> serde::de::VariantAccess<'de> for &mut Deserializer
         Ok(())
     }
 
+    #[inline(never)]
     fn newtype_variant_seed<V: DeserializeSeed<'de>>(self, seed: V) -> Result<V::Value> {
         DeserializeSeed::deserialize(seed, self)
     }
 
+    #[inline(never)]
     fn tuple_variant<V: Visitor<'de>>(self, len: usize, visitor: V) -> Result<V::Value> {
         serde::de::Deserializer::deserialize_tuple(self, len, visitor)
     }
 
+    #[inline(never)]
     fn struct_variant<V: Visitor<'de>>(self, _fields: &'static [&'static str], visitor: V) -> Result<V::Value> {
         serde::de::Deserializer::deserialize_struct(self, "", _fields, visitor)
     }
