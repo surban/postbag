@@ -1,0 +1,36 @@
+[package]
+name = "compile-bench"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+postbag = { path = ".." }
+bincode = "1"
+bincode2 = { package = "bincode", version = "2", features = ["serde"] }
+serde_json = "1"
+
+[[bin]]
+name = "postbag_full"
+path = "src/postbag_full.rs"
+
+[[bin]]
+name = "postbag_slim"
+path = "src/postbag_slim.rs"
+
+[[bin]]
+name = "bincode"
+path = "src/bincode.rs"
+
+[[bin]]
+name = "serde_json"
+path = "src/serde_json.rs"
+
+[[bin]]
+name = "serde_only"
+path = "src/serde_only.rs"
+
+[[bin]]
+name = "bincode2"
+path = "src/bincode2.rs"
