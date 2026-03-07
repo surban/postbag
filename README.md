@@ -85,7 +85,7 @@ The `Slim` configuration prioritizes performance and compact size:
 
 **Important**: Fields and enum variants must maintain their order for compatibility when using `Slim` configuration.
 
-## Fast Compile Mode
+## Experimental Fast Compile Mode (for development use)
 
 Postbag supports an optional fast compile mode that reduces compilation time at the cost of buffering struct field data in memory during deserialization (instead of streaming it directly from the reader).
 
@@ -103,6 +103,8 @@ rustflags = ["--cfg", "postbag_fast_compile"]
 ```
 
 This flag is intended for development use only. Production builds should use the default streaming mode.
+
+**Limitation**: Forward/backward compatibility for adding or removing struct fields in the middle (i.e. not at the end) is not supported in fast compile mode. Adding or removing fields at the end of structs continues to work.
 
 ## Origins
 
