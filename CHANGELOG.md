@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.3
+
+- make #[serde(alias="...")] work in fast compile mode
+
 ## 0.4.2
 
 - Reduced compile times by adding `#[inline(never)]` to serde trait implementation

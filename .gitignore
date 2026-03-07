@@ -1,5 +1,4 @@
 /target
 /compile-bench/target
 **/*.rs.bk
-Cargo.lock
 .vscode

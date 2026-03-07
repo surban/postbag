@@ -576,6 +576,7 @@ fn account_credentials_slim_without_urls() {
 // =============================================================================
 
 #[test]
+#[cfg_attr(postbag_fast_compile, ignore = "fast_compile does not support adding fields in the middle")]
 fn added_struct_field_in_middle() {
     #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
     struct A {
@@ -632,6 +633,7 @@ fn removed_struct_field_from_middle() {
 }
 
 #[test]
+#[cfg_attr(postbag_fast_compile, ignore = "fast_compile does not support adding fields in the middle")]
 fn added_and_removed_struct_fields_in_middle() {
     #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
     struct A {
@@ -663,6 +665,7 @@ fn added_and_removed_struct_fields_in_middle() {
 }
 
 #[test]
+#[cfg_attr(postbag_fast_compile, ignore = "fast_compile does not support adding fields in the middle")]
 fn added_struct_variant_field_in_middle() {
     #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
     enum A {
