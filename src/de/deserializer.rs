@@ -276,25 +276,29 @@ impl<'de, CFG: Cfg> serde::de::SeqAccess<'de> for BufferedFieldSeqAccess<'de, CF
 
     #[inline(never)]
     fn next_element_seed<V: DeserializeSeed<'de>>(&mut self, seed: V) -> Result<Option<V::Value>> {
-        if self.index >= self.field_data.len() {
-            return Ok(None);
-        }
+        // Skip over unfilled alias slots.
+        //
+        // Serde includes both aliases and canonical names in the `fields`
+        // array passed to `deserialize_struct`, but `visit_seq` expects
+        // exactly one element per actual struct field. Alias entries that
+        // did not match any wire field are `None` and must be skipped.
+        while self.index < self.field_data.len() {
+            let idx = self.index;
+            self.index += 1;
 
-        let idx = self.index;
-        self.index += 1;
-
-        match self.field_data[idx].take() {
-            Some(raw) => {
+            if let Some(raw) = self.field_data[idx].take() {
                 let mut deser = Deserializer::<&[u8], CFG>::new(raw.as_slice());
                 let value = DeserializeSeed::deserialize(seed, &mut deser)?;
-                Ok(Some(value))
+                return Ok(Some(value));
             }
-            None => Ok(None),
         }
+
+        Ok(None)
     }
 
     fn size_hint(&self) -> Option<usize> {
-        Some(self.field_data.len() - self.index)
+        let remaining = self.field_data[self.index..].iter().filter(|s| s.is_some()).count();
+        Some(remaining)
     }
 }
 
