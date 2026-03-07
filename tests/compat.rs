@@ -570,3 +570,150 @@ fn account_credentials_slim_without_urls() {
 
     let _: AccountCredentials = transform::<_, _, Slim>(&test_credentials);
 }
+
+// =============================================================================
+// Middle field add/remove tests
+// =============================================================================
+
+#[test]
+fn added_struct_field_in_middle() {
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    struct A {
+        f1: u32,
+        f2: u32,
+        f3: u32,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct B {
+        f1: u32,
+        #[serde(default = "mid_default")]
+        f_mid: u32,
+        f2: u32,
+        f3: u32,
+    }
+
+    const fn mid_default() -> u32 {
+        99
+    }
+
+    let a = A { f1: 1, f2: 2, f3: 3 };
+
+    // Full mode: fields matched by name, so inserting in the middle works.
+    let b: B = transform::<_, _, Full>(&a);
+    assert_eq!(b.f1, a.f1);
+    assert_eq!(b.f_mid, mid_default());
+    assert_eq!(b.f2, a.f2);
+    assert_eq!(b.f3, a.f3);
+}
+
+#[test]
+fn removed_struct_field_from_middle() {
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    struct A {
+        f1: u32,
+        f2: u32,
+        f3: u32,
+    }
+
+    // B drops f2 from the middle.
+    #[derive(Serialize, Deserialize)]
+    struct B {
+        f1: u32,
+        f3: u32,
+    }
+
+    let a = A { f1: 1, f2: 2, f3: 3 };
+
+    // Full mode: fields matched by name, so removal from the middle works.
+    let b: B = transform::<_, _, Full>(&a);
+    assert_eq!(b.f1, a.f1);
+    assert_eq!(b.f3, a.f3);
+}
+
+#[test]
+fn added_and_removed_struct_fields_in_middle() {
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    struct A {
+        f1: u32,
+        f2: u32,
+        f3: u32,
+        f4: u32,
+    }
+
+    // B keeps f1 and f4, drops f2/f3, adds f_new in the middle.
+    #[derive(Serialize, Deserialize)]
+    struct B {
+        f1: u32,
+        #[serde(default = "new_default")]
+        f_new: u32,
+        f4: u32,
+    }
+
+    const fn new_default() -> u32 {
+        77
+    }
+
+    let a = A { f1: 1, f2: 2, f3: 3, f4: 4 };
+
+    let b: B = transform::<_, _, Full>(&a);
+    assert_eq!(b.f1, a.f1);
+    assert_eq!(b.f_new, new_default());
+    assert_eq!(b.f4, a.f4);
+}
+
+#[test]
+fn added_struct_variant_field_in_middle() {
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    enum A {
+        V1,
+        V2 { f1: u32, f2: u32, f3: u32 },
+    }
+
+    #[derive(Serialize, Deserialize)]
+    enum B {
+        V1,
+        V2 {
+            f1: u32,
+            #[serde(default = "mid_default2")]
+            f_mid: u32,
+            f2: u32,
+            f3: u32,
+        },
+    }
+
+    const fn mid_default2() -> u32 {
+        55
+    }
+
+    let a = A::V2 { f1: 1, f2: 2, f3: 3 };
+
+    let b: B = transform::<_, _, Full>(&a);
+    let B::V2 { f1, f_mid, f2, f3 } = b else { panic!("wrong variant") };
+    assert_eq!(f1, 1);
+    assert_eq!(f_mid, mid_default2());
+    assert_eq!(f2, 2);
+    assert_eq!(f3, 3);
+}
+
+#[test]
+fn removed_struct_variant_field_from_middle() {
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    enum A {
+        V1,
+        V2 { f1: u32, f2: u32, f3: u32 },
+    }
+
+    #[derive(Serialize, Deserialize)]
+    enum B {
+        V1,
+        V2 { f1: u32, f3: u32 },
+    }
+
+    let a = A::V2 { f1: 1, f2: 2, f3: 3 };
+
+    let b: B = transform::<_, _, Full>(&a);
+    let B::V2 { f1, f3 } = b else { panic!("wrong variant") };
+    assert_eq!(f1, 1);
+    assert_eq!(f3, 3);
+}
