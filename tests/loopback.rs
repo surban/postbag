@@ -861,3 +861,47 @@ fn fixed_int() {
 
     loopback(DefinitelyLE { x: 0xABCD });
 }
+
+// =============================================================================
+// Serde alias tests
+// =============================================================================
+
+/// Exposure.
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]
+pub struct Exposure {
+    /// Gain level.
+    pub gain: u8,
+    /// Exposure time in microseconds.
+    #[serde(alias = "time_100usec")]
+    pub time_usec: u32,
+}
+
+#[test]
+fn serde_alias_loopback() {
+    loopback(Exposure { gain: 42, time_usec: 100_000 });
+    loopback(Exposure { gain: 0, time_usec: 0 });
+    loopback(Exposure { gain: 255, time_usec: u32::MAX });
+}
+
+#[test]
+fn serde_alias_compat() {
+    // Old struct uses the original field name that is now an alias.
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    struct ExposureOld {
+        gain: u8,
+        time_100usec: u32,
+    }
+
+    let old = ExposureOld { gain: 42, time_100usec: 100_000 };
+
+    // Serialize with old field name, deserialize with new struct that has alias.
+    // This only works in Full mode (field names are serialized).
+    let mut serialized = Vec::new();
+    serialize::<Full, _, _>(&mut serialized, &old).expect("serialization failed");
+    println!("old serialized: {serialized:02x?}");
+
+    let new: Exposure =
+        deserialize::<Full, _, _>(serialized.as_slice()).expect("deserialization with alias failed");
+    assert_eq!(new.gain, old.gain);
+    assert_eq!(new.time_usec, old.time_100usec);
+}
